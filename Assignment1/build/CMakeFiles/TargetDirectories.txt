@@ -1,0 +1,3 @@
+/home/iotaaryan/Documents/CGAssignments/Assignment1/build/CMakeFiles/main.dir
+/home/iotaaryan/Documents/CGAssignments/Assignment1/build/CMakeFiles/edit_cache.dir
+/home/iotaaryan/Documents/CGAssignments/Assignment1/build/CMakeFiles/rebuild_cache.dir
