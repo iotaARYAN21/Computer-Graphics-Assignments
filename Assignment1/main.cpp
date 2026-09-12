@@ -61,7 +61,24 @@ void generateGrid(vector<float>& a,int n){
         }
     }
 }
+
+void generatecube(vector<float>& a, int x, int y,int z){
+    //8 corners of the cube
+    a={
+        (float)x,    (float)y,    (float)z,   
+        (float)x+1,  (float)y,    (float)z,
+        (float)x+1,  (float)y+1,  (float)z,
+        (float)x,    (float)y+1,  (float)z,
+
+        (float)x,    (float)y,    (float)z+1,   
+        (float)x+1,  (float)y,    (float)z+1,
+        (float)x+1,  (float)y+1,  (float)z+1,
+        (float)x,    (float)y+1,  (float)z+1,
+    };
+}
+
 int main(){
+    glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
     if(glfwInit()==-1){
         return -1;
     }
@@ -88,6 +105,61 @@ int main(){
     vector<float> vertices;
     generateGrid(vertices,n);
 
+    vector<float> cubeVertices;
+    //1x1x1 cube
+    int cubeX =2;
+    int cubeY =2;
+    int cubeZ =2;
+    generatecube(cubeVertices, cubeX, cubeY,cubeZ);
+    vector<unsigned int> cubeIndices ={
+        // Front face
+        4, 5, 6,
+        4, 6, 7,
+
+        // Back face
+        0, 2, 1,
+        0, 3, 2,
+
+        // Left face
+        0, 4, 7,
+        0, 7, 3 ,
+        
+        // Right face
+        1, 2, 6,
+        1, 6, 5,
+
+        // Top face
+        3, 7, 6,
+        3, 6, 2,
+
+        // Bottom face
+        0, 1, 5,
+        0, 5, 4,
+    };
+
+    unsigned int cubeVAO;
+    unsigned int cubeVBO;
+    unsigned int cubeEBO;
+
+    glGenVertexArrays(1, &cubeVAO);
+    glGenBuffers(1, &cubeVBO);
+    glGenBuffers(1, &cubeEBO);
+    glBindVertexArray(cubeVAO);
+
+    //VBO
+    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
+    glBufferData(GL_ARRAY_BUFFER,cubeVertices.size()*sizeof(float),cubeVertices.data(),GL_STATIC_DRAW);
+
+    // EBO
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cubeEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,cubeIndices.size()*sizeof(unsigned int),cubeIndices.data(),GL_STATIC_DRAW);
+
+    // Vertex position
+    glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,3*sizeof(float),(void*)0);
+    glEnableVertexAttribArray(0);
+    glBindVertexArray(0);
+
+
     unsigned int VAO,VBO;
     glGenVertexArrays(1,&VAO);
     glGenBuffers(1,&VBO);
@@ -101,34 +173,20 @@ int main(){
 
     glEnableVertexAttribArray(0);
 
-        string vertexShaderSource =
-        readFile("vertexShader.glsl");
+    string vertexShaderSource = readFile("vertexShader.glsl");
 
-    string fragmentShaderSource =
-        readFile("fragmentShader.glsl");
+    string fragmentShaderSource = readFile("fragmentShader.glsl");
 
-        GLuint vertexShader =
-        glCreateShader(GL_VERTEX_SHADER);
+    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
 
-    const char* vertexSource =
-        vertexShaderSource.c_str();
+    const char* vertexSource = vertexShaderSource.c_str();
 
-    glShaderSource(
-        vertexShader,
-        1,
-        &vertexSource,
-        NULL
-    );
-
+    glShaderSource(vertexShader, 1, &vertexSource, NULL);
     glCompileShader(vertexShader);
 
     GLint success;
 
-    glGetShaderiv(
-        vertexShader,
-        GL_COMPILE_STATUS,
-        &success
-    );
+    glGetShaderiv( vertexShader, GL_COMPILE_STATUS, &success);
 
     if (!success)
     {
@@ -224,6 +282,8 @@ int main(){
 
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
+    GLint mvpLocation = glGetUniformLocation(shaderProgram, "MVP");
+    GLint colorLocation = glGetUniformLocation(shaderProgram,"objectColor");
 
     while(!glfwWindowShouldClose(window)){
         glClearColor(0.1f,0.1f,0.1f,1.0f);
@@ -243,12 +303,6 @@ int main(){
          glUseProgram(shaderProgram);
 
 
-        GLint mvpLocation =
-            glGetUniformLocation(
-                shaderProgram,
-                "MVP"
-            );
-
         glUniformMatrix4fv(
             mvpLocation,
             1,
@@ -256,8 +310,16 @@ int main(){
             glm::value_ptr(MVP)
         );
 
+        // GRID
+        glUniform3f(colorLocation, 1.0f, 1.0f, 1.0f);
         glBindVertexArray(VAO);
         glDrawArrays(GL_LINES,0,vertices.size()/3);
+
+        //cube
+        glUniform3f(colorLocation, 1.0f,0.0f, 0.0f);
+        glBindVertexArray(cubeVAO);
+        glDrawElements(GL_TRIANGLES, cubeIndices.size(), GL_UNSIGNED_INT, 0);
+
         glBindVertexArray(0);
         glfwSwapBuffers(window);
         glfwPollEvents();   
