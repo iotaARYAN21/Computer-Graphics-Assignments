@@ -140,10 +140,7 @@ int main(){
     generateGrid(vertices,n);
 
     vector<float> cubeVertices;
-    //1x1x1 cube
-    int cubeX =2;
-    int cubeY =2;
-    int cubeZ =2;
+
     generateCube(cubeVertices, cubeX, cubeY,cubeZ);
     vector<unsigned int> cubeIndices ={
         // Front face
