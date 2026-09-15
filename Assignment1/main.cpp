@@ -140,12 +140,12 @@ int main(){
     generateGrid(vertices,n);
 
     vector<float> cubeVertices;
-
-
-    generateCube(cubeVertices,cubeX,cubeY,cubeZ);
-
-    vector<unsigned int> cubeIndices = {
-
+    //1x1x1 cube
+    int cubeX =2;
+    int cubeY =2;
+    int cubeZ =2;
+    generateCube(cubeVertices, cubeX, cubeY,cubeZ);
+    vector<unsigned int> cubeIndices ={
         // Front face
         4, 5, 6,
         4, 6, 7,
@@ -188,15 +188,13 @@ int main(){
 
     // EBO
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cubeEBO);
-
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,cubeIndices.size()*sizeof(unsigned int),cubeIndices.data(),GL_STATIC_DRAW);
 
     // Vertex position
     glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,3*sizeof(float),(void*)0);
-
     glEnableVertexAttribArray(0);
-
     glBindVertexArray(0);
+
 
     unsigned int VAO,VBO;
     glGenVertexArrays(1,&VAO);
@@ -218,17 +216,14 @@ int main(){
 
     const char* vertexSource = vertexShaderSource.c_str();
 
-    glShaderSource(vertexShader,1,&vertexSource,NULL);
+    // glShaderSource(vertexShader,1,&vertexSource,NULL);
 
+    glShaderSource(vertexShader, 1, &vertexSource, NULL);
     glCompileShader(vertexShader);
 
     GLint success;
 
-    glGetShaderiv(
-        vertexShader,
-        GL_COMPILE_STATUS,
-        &success
-    );
+    glGetShaderiv( vertexShader, GL_COMPILE_STATUS, &success);
 
     if (!success)
     {
