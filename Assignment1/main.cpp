@@ -12,11 +12,20 @@ int cubeX = 2;
 int cubeY =2;
 int cubeZ = 2;
 
+//color
+float colR=1.0f;
+float colG=0.0f;
+float colB=0.0f;
+
 void key_callback(GLFWwindow* window,int key,int scancode,int action,int mods)
 {
     if (action != GLFW_PRESS)
         return;
 
+    if (key==GLFW_KEY_C){
+        cout<<"Enter floating point RGB vals (0-1): \n";
+        cin>>colR>>colG>>colB;
+    }
     if (key == GLFW_KEY_LEFT && cubeX > 0)
         cubeX--;
 
@@ -106,6 +115,7 @@ void generateCube(vector<float>& a, int x, int y, int z)
     };
 }
 int main(){
+    glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
 
    if(!glfwInit()){
        return -1;
@@ -339,7 +349,7 @@ int main(){
         glBufferData(GL_ARRAY_BUFFER,cubeVertices.size()*sizeof(float),cubeVertices.data(),GL_DYNAMIC_DRAW);
 
         // CUBE
-        glUniform3f(colorLocation, 1.0f, 0.0f, 0.0f);
+        glUniform3f(colorLocation, colR, colG, colB);
         glBindVertexArray(cubeVAO);
         glDrawElements(GL_TRIANGLES,cubeIndices.size(),GL_UNSIGNED_INT,0);
         

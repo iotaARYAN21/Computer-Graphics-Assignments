@@ -4,7 +4,7 @@
 # compile CXX with /usr/bin/c++
 CXX_DEFINES = 
 
-CXX_INCLUDES = -I/home/iotaaryan/Documents/CGAssignments/Assignment1/glm
+CXX_INCLUDES = -I/home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/../../glm
 
 CXX_FLAGS = 
 
