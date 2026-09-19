@@ -153,6 +153,54 @@ main.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main.cpp.s
 .PHONY : main.cpp.s
 
+shadersUtil.o: shadersUtil.cpp.o
+.PHONY : shadersUtil.o
+
+# target to build an object file
+shadersUtil.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/shadersUtil.cpp.o
+.PHONY : shadersUtil.cpp.o
+
+shadersUtil.i: shadersUtil.cpp.i
+.PHONY : shadersUtil.i
+
+# target to preprocess a source file
+shadersUtil.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/shadersUtil.cpp.i
+.PHONY : shadersUtil.cpp.i
+
+shadersUtil.s: shadersUtil.cpp.s
+.PHONY : shadersUtil.s
+
+# target to generate assembly for a file
+shadersUtil.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/shadersUtil.cpp.s
+.PHONY : shadersUtil.cpp.s
+
+shapeUtil.o: shapeUtil.cpp.o
+.PHONY : shapeUtil.o
+
+# target to build an object file
+shapeUtil.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/shapeUtil.cpp.o
+.PHONY : shapeUtil.cpp.o
+
+shapeUtil.i: shapeUtil.cpp.i
+.PHONY : shapeUtil.i
+
+# target to preprocess a source file
+shapeUtil.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/shapeUtil.cpp.i
+.PHONY : shapeUtil.cpp.i
+
+shapeUtil.s: shapeUtil.cpp.s
+.PHONY : shapeUtil.s
+
+# target to generate assembly for a file
+shapeUtil.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/shapeUtil.cpp.s
+.PHONY : shapeUtil.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -165,6 +213,12 @@ help:
 	@echo "... main.o"
 	@echo "... main.i"
 	@echo "... main.s"
+	@echo "... shadersUtil.o"
+	@echo "... shadersUtil.i"
+	@echo "... shadersUtil.s"
+	@echo "... shapeUtil.o"
+	@echo "... shapeUtil.i"
+	@echo "... shapeUtil.s"
 .PHONY : help
 
 

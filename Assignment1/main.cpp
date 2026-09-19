@@ -1,5 +1,7 @@
 #include<GL/glew.h>
 #include<GLFW/glfw3.h>
+#include "shadersUtil.h"
+#include "shapeUtil.h"
 #include<bits/stdc++.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -45,75 +47,7 @@ void key_callback(GLFWwindow* window,int key,int scancode,int action,int mods)
         cubeZ--;
 }
 
-string readFile(const string& filename)
-{
-    ifstream file(filename);
 
-    if (!file.is_open())
-    {
-        cerr << "Could not open file: " << filename << endl;
-        return "";
-    }
-
-    stringstream buffer;
-    buffer << file.rdbuf();
-
-    return buffer.str();
-}
-void generateGrid(vector<float>& a,int n){
-    for(int y=0;y<=n;y++){
-        for(int z=0;z<=n;z++){
-            a.push_back(0);
-            a.push_back(y);
-            a.push_back(z);
-
-            a.push_back(n);
-            a.push_back(y);
-            a.push_back(z);
-        }
-    }
-
-    //y 
-    for(int x=0;x<=n;x++){
-        for(int z=0;z<=n;z++){
-            a.push_back(x);
-            a.push_back(0);
-            a.push_back(z);
-
-            a.push_back(x);
-            a.push_back(n);
-            a.push_back(z);
-        }
-    }
-
-    //z
-    for(int x=0;x<=n;x++){
-        for(int y=0;y<=n;y++){
-            a.push_back(x);
-            a.push_back(y);
-            a.push_back(0);
-
-            a.push_back(x);
-            a.push_back(y);
-            a.push_back(n);
-        }
-    }
-}
-void generateCube(vector<float>& a, int x, int y, int z)
-{
-    // 8 corners of the cube
-    a = {
-        (float)x,     (float)y,     (float)z,       // 0
-        (float)x + 1, (float)y,     (float)z,       // 1
-        (float)x + 1, (float)y + 1, (float)z,       // 2
-        (float)x,     (float)y + 1, (float)z,       // 3
-
-        (float)x,     (float)y,     (float)z + 1,   // 4
-        (float)x + 1, (float)y,     (float)z + 1,   // 5
-        (float)x + 1, (float)y + 1, (float)z + 1,   // 6
-        (float)x,     (float)y + 1, (float)z + 1    // 7
-    };
-}
 int main(){
     glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
 
@@ -151,7 +85,7 @@ int main(){
 
     vector<float> cubeVertices;
 
-    generateCube(cubeVertices, cubeX, cubeY,cubeZ);
+    generateCube(cubeVertices);
     vector<unsigned int> cubeIndices ={
         // Front face
         4, 5, 6,
@@ -326,13 +260,15 @@ int main(){
 
     GLint mvpLocation = glGetUniformLocation(shaderProgram,"MVP");
     GLint colorLocation = glGetUniformLocation(shaderProgram,"objectColor");
+    
+    glm::mat4 view = glm::lookAt(glm::vec3(10.0f,10.0f,10.0f),glm::vec3(2.5f,2.5f,2.5f),glm::vec3(0.0f,1.0f,0.0f));
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f),800.0f/800.0f,0.1f,100.0f);
+
     while(!glfwWindowShouldClose(window)){
         glClearColor(0.1f,0.1f,0.1f,1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glm::mat4 model=glm::mat4(1.0f);
-        glm::mat4 view = glm::lookAt(glm::vec3(10.0f,10.0f,10.0f),glm::vec3(2.5f,2.5f,2.5f),glm::vec3(0.0f,1.0f,0.0f));
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f),800.0f/800.0f,0.1f,100.0f);
         glm::mat4 MVP = projection * view * model;
         glUseProgram(shaderProgram);
 
@@ -343,12 +279,16 @@ int main(){
         glBindVertexArray(VAO);
         glDrawArrays(GL_LINES,0,vertices.size()/3);
         
-        cubeVertices.clear();
-        generateCube(cubeVertices,cubeX,cubeY,cubeZ);
-        glBindBuffer(GL_ARRAY_BUFFER,cubeVBO);
-        glBufferData(GL_ARRAY_BUFFER,cubeVertices.size()*sizeof(float),cubeVertices.data(),GL_DYNAMIC_DRAW);
+        // cubeVertices.clear();
+        // generateCube(cubeVertices);
+        // glBindBuffer(GL_ARRAY_BUFFER,cubeVBO);
+        // glBufferData(GL_ARRAY_BUFFER,cubeVertices.size()*sizeof(float),cubeVertices.data(),GL_DYNAMIC_DRAW);
 
         // CUBE
+        model = glm::translate(glm::mat4(1.0f),glm::vec3(cubeX,cubeY,cubeZ));
+        MVP = projection * view * model;
+        glUniformMatrix4fv(mvpLocation,1,GL_FALSE,glm::value_ptr(MVP));
+
         glUniform3f(colorLocation, colR, colG, colB);
         glBindVertexArray(cubeVAO);
         glDrawElements(GL_TRIANGLES,cubeIndices.size(),GL_UNSIGNED_INT,0);
