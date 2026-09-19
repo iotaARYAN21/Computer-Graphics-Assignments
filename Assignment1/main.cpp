@@ -9,6 +9,14 @@
 #include <fstream>
 #include <sstream>
 using namespace std;
+
+struct Cell{
+    bool filled = false;
+    float r= 0.0f;
+    float g = 0.0f;
+    float b = 0.0f;
+};
+
 // 1x1x1 cube
 int cubeX = 2;
 int cubeY =2;
@@ -19,10 +27,27 @@ float colR=1.0f;
 float colG=0.0f;
 float colB=0.0f;
 
+// Cell array
+Cell cells[5][5][5]; // as there are 125 cells
+
 void key_callback(GLFWwindow* window,int key,int scancode,int action,int mods)
 {
     if (action != GLFW_PRESS)
         return;
+
+    if(key == GLFW_KEY_F){
+        cells[cubeX][cubeY][cubeZ].filled=true;
+        cells[cubeX][cubeY][cubeZ].r=colR;
+        cells[cubeX][cubeY][cubeZ].g=colG;
+        cells[cubeX][cubeY][cubeZ].b=colB;
+    }
+
+    if(key == GLFW_KEY_W){
+        cells[cubeX][cubeY][cubeZ].filled=false;
+        cells[cubeX][cubeY][cubeZ].r=0.0f;
+        cells[cubeX][cubeY][cubeZ].g=0.0f;
+        cells[cubeX][cubeY][cubeZ].b=0.0f;
+    }
 
     if (key==GLFW_KEY_C){
         cout<<"Enter floating point RGB vals (0-1): \n";
@@ -284,7 +309,23 @@ int main(){
         // glBindBuffer(GL_ARRAY_BUFFER,cubeVBO);
         // glBufferData(GL_ARRAY_BUFFER,cubeVertices.size()*sizeof(float),cubeVertices.data(),GL_DYNAMIC_DRAW);
 
-        // CUBE
+        // filled cells
+        for(int x=0;x<5;x++){
+            for(int y=0;y<5;y++){
+                for(int z=0;z<5;z++){
+                    if(!cells[x][y][z].filled)continue;
+
+                    model = glm::translate(glm::mat4(1.0f),glm::vec3(x,y,z));
+                    MVP = projection * view * model;
+                    glUniformMatrix4fv(mvpLocation,1,GL_FALSE,glm::value_ptr(MVP));
+                    glUniform3f(colorLocation,cells[x][y][z].r,cells[x][y][z].g,cells[x][y][z].b);
+                    glBindVertexArray(cubeVAO);
+                    glDrawElements(GL_TRIANGLES,cubeIndices.size(),GL_UNSIGNED_INT,0);
+                }
+            }
+        }
+
+        // unit CUBE
         model = glm::translate(glm::mat4(1.0f),glm::vec3(cubeX,cubeY,cubeZ));
         MVP = projection * view * model;
         glUniformMatrix4fv(mvpLocation,1,GL_FALSE,glm::value_ptr(MVP));
@@ -293,11 +334,11 @@ int main(){
         glBindVertexArray(cubeVAO);
         glDrawElements(GL_TRIANGLES,cubeIndices.size(),GL_UNSIGNED_INT,0);
         
+
         glBindVertexArray(0);
 
         glfwSwapBuffers(window);
         glfwPollEvents();   
-        // glDrawArrays(GL_LINE,)
     }
 
     glDeleteVertexArrays(1, &cubeVAO);
