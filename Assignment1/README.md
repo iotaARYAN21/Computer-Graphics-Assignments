@@ -7,6 +7,7 @@
 ## Output Model
 ![Tree](./model.png)
 
+https://github.com/user-attachments/assets/60c40134-def0-42b4-a17f-ba22eb380d5b
 
 ## Working Principle
 
