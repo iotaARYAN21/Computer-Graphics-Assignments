@@ -9,11 +9,8 @@ set(CMAKE_DEPENDS_LANGUAGES
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/main.cpp" "CMakeFiles/main.dir/main.cpp.o" "gcc" "CMakeFiles/main.dir/main.cpp.o.d"
-<<<<<<< Updated upstream
-=======
   "/home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/shadersUtil.cpp" "CMakeFiles/main.dir/shadersUtil.cpp.o" "gcc" "CMakeFiles/main.dir/shadersUtil.cpp.o.d"
   "/home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/shapeUtil.cpp" "CMakeFiles/main.dir/shapeUtil.cpp.o" "gcc" "CMakeFiles/main.dir/shapeUtil.cpp.o.d"
->>>>>>> Stashed changes
   "" "main" "gcc" "CMakeFiles/main.dir/link.d"
   )
 
