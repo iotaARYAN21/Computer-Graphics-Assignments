@@ -25,8 +25,39 @@ CMakeFiles/main.dir/main.cpp.o: \
  /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
  /usr/include/x86_64-linux-gnu/bits/stdint-least.h /usr/include/GL/glu.h \
  /usr/include/GL/gl.h /usr/include/GLFW/glfw3.h \
+<<<<<<< Updated upstream
  /usr/include/x86_64-linux-gnu/c++/15/bits/stdc++.h \
  /usr/include/c++/15/cassert /usr/include/assert.h \
+=======
+ /home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/shadersUtil.h \
+ /usr/include/c++/15/string /usr/include/c++/15/bits/requires_hosted.h \
+ /usr/include/c++/15/bits/stringfwd.h \
+ /usr/include/c++/15/bits/memoryfwd.h \
+ /usr/include/c++/15/bits/char_traits.h \
+ /usr/include/c++/15/bits/postypes.h /usr/include/c++/15/cwchar \
+ /usr/include/wchar.h /usr/include/x86_64-linux-gnu/bits/floatn.h \
+ /usr/include/x86_64-linux-gnu/bits/floatn-common.h \
+ /usr/lib/gcc/x86_64-linux-gnu/15/include/stdarg.h \
+ /usr/include/x86_64-linux-gnu/bits/types/wint_t.h \
+ /usr/include/x86_64-linux-gnu/bits/types/mbstate_t.h \
+ /usr/include/x86_64-linux-gnu/bits/types/__mbstate_t.h \
+ /usr/include/x86_64-linux-gnu/bits/types/__FILE.h \
+ /usr/include/x86_64-linux-gnu/bits/types/FILE.h \
+ /usr/include/x86_64-linux-gnu/bits/types/locale_t.h \
+ /usr/include/x86_64-linux-gnu/bits/types/__locale_t.h \
+ /usr/include/c++/15/type_traits /usr/include/c++/15/bits/allocator.h \
+ /usr/include/x86_64-linux-gnu/c++/15/bits/c++allocator.h \
+ /usr/include/c++/15/bits/new_allocator.h /usr/include/c++/15/new \
+ /usr/include/c++/15/bits/exception.h \
+ /usr/include/c++/15/bits/functexcept.h \
+ /usr/include/c++/15/bits/exception_defines.h \
+ /usr/include/c++/15/bits/move.h \
+ /usr/include/c++/15/bits/cpp_type_traits.h \
+ /usr/include/c++/15/bits/localefwd.h \
+ /usr/include/x86_64-linux-gnu/c++/15/bits/c++locale.h \
+ /usr/include/c++/15/clocale /usr/include/locale.h \
+ /usr/include/x86_64-linux-gnu/bits/locale.h /usr/include/c++/15/iosfwd \
+>>>>>>> Stashed changes
  /usr/include/c++/15/cctype /usr/include/ctype.h \
  /usr/include/x86_64-linux-gnu/bits/endian.h \
  /usr/include/x86_64-linux-gnu/bits/endianness.h \
@@ -143,6 +174,38 @@ CMakeFiles/main.dir/main.cpp.o: \
  /usr/include/c++/15/bits/memory_resource.h \
  /usr/include/c++/15/bits/uses_allocator.h \
  /usr/include/c++/15/bits/uses_allocator_args.h /usr/include/c++/15/tuple \
+<<<<<<< Updated upstream
+=======
+ /home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/shapeUtil.h \
+ /usr/include/c++/15/vector /usr/include/c++/15/bits/stl_uninitialized.h \
+ /usr/include/c++/15/bits/stl_vector.h \
+ /usr/include/c++/15/bits/stl_bvector.h \
+ /usr/include/c++/15/bits/vector.tcc \
+ /usr/include/x86_64-linux-gnu/c++/15/bits/stdc++.h \
+ /usr/include/c++/15/cassert /usr/include/assert.h \
+ /usr/include/c++/15/cfloat \
+ /usr/lib/gcc/x86_64-linux-gnu/15/include/float.h \
+ /usr/include/c++/15/climits \
+ /usr/lib/gcc/x86_64-linux-gnu/15/include/limits.h \
+ /usr/lib/gcc/x86_64-linux-gnu/15/include/syslimits.h \
+ /usr/include/limits.h /usr/include/x86_64-linux-gnu/bits/posix1_lim.h \
+ /usr/include/x86_64-linux-gnu/bits/local_lim.h \
+ /usr/include/linux/limits.h \
+ /usr/include/x86_64-linux-gnu/bits/pthread_stack_min-dynamic.h \
+ /usr/include/x86_64-linux-gnu/bits/posix2_lim.h \
+ /usr/include/x86_64-linux-gnu/bits/xopen_lim.h \
+ /usr/include/x86_64-linux-gnu/bits/uio_lim.h /usr/include/c++/15/csetjmp \
+ /usr/include/setjmp.h /usr/include/x86_64-linux-gnu/bits/setjmp.h \
+ /usr/include/x86_64-linux-gnu/bits/types/struct___jmp_buf_tag.h \
+ /usr/include/c++/15/cstdarg /usr/include/c++/15/algorithm \
+ /usr/include/c++/15/bits/stl_algo.h \
+ /usr/include/c++/15/bits/algorithmfwd.h \
+ /usr/include/c++/15/bits/stl_heap.h \
+ /usr/include/c++/15/bits/uniform_int_dist.h \
+ /usr/include/c++/15/bits/stl_tempbuf.h \
+ /usr/include/c++/15/pstl/glue_algorithm_defs.h \
+ /usr/include/c++/15/pstl/execution_defs.h /usr/include/c++/15/bitset \
+>>>>>>> Stashed changes
  /usr/include/c++/15/functional /usr/include/c++/15/bits/std_function.h \
  /usr/include/c++/15/typeinfo /usr/include/c++/15/unordered_map \
  /usr/include/c++/15/bits/unordered_map.h \
