@@ -53,10 +53,10 @@ RM = /usr/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1
+CMAKE_SOURCE_DIR = /home/iotaaryan/Documents/CGAssignments/Assignment1
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/build
+CMAKE_BINARY_DIR = /home/iotaaryan/Documents/CGAssignments/Assignment1/build
 
 # Include any dependencies generated for this target.
 include CMakeFiles/main.dir/depend.make
@@ -73,46 +73,46 @@ CMakeFiles/main.dir/codegen:
 .PHONY : CMakeFiles/main.dir/codegen
 
 CMakeFiles/main.dir/main.cpp.o: CMakeFiles/main.dir/flags.make
-CMakeFiles/main.dir/main.cpp.o: /home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/main.cpp
+CMakeFiles/main.dir/main.cpp.o: /home/iotaaryan/Documents/CGAssignments/Assignment1/main.cpp
 CMakeFiles/main.dir/main.cpp.o: CMakeFiles/main.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/main.dir/main.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/main.dir/main.cpp.o -MF CMakeFiles/main.dir/main.cpp.o.d -o CMakeFiles/main.dir/main.cpp.o -c /home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/main.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/iotaaryan/Documents/CGAssignments/Assignment1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/main.dir/main.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/main.dir/main.cpp.o -MF CMakeFiles/main.dir/main.cpp.o.d -o CMakeFiles/main.dir/main.cpp.o -c /home/iotaaryan/Documents/CGAssignments/Assignment1/main.cpp
 
 CMakeFiles/main.dir/main.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/main.dir/main.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/main.cpp > CMakeFiles/main.dir/main.cpp.i
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/iotaaryan/Documents/CGAssignments/Assignment1/main.cpp > CMakeFiles/main.dir/main.cpp.i
 
 CMakeFiles/main.dir/main.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/main.dir/main.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/main.cpp -o CMakeFiles/main.dir/main.cpp.s
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/iotaaryan/Documents/CGAssignments/Assignment1/main.cpp -o CMakeFiles/main.dir/main.cpp.s
 
 CMakeFiles/main.dir/shadersUtil.cpp.o: CMakeFiles/main.dir/flags.make
-CMakeFiles/main.dir/shadersUtil.cpp.o: /home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/shadersUtil.cpp
+CMakeFiles/main.dir/shadersUtil.cpp.o: /home/iotaaryan/Documents/CGAssignments/Assignment1/shadersUtil.cpp
 CMakeFiles/main.dir/shadersUtil.cpp.o: CMakeFiles/main.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/main.dir/shadersUtil.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/main.dir/shadersUtil.cpp.o -MF CMakeFiles/main.dir/shadersUtil.cpp.o.d -o CMakeFiles/main.dir/shadersUtil.cpp.o -c /home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/shadersUtil.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/iotaaryan/Documents/CGAssignments/Assignment1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/main.dir/shadersUtil.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/main.dir/shadersUtil.cpp.o -MF CMakeFiles/main.dir/shadersUtil.cpp.o.d -o CMakeFiles/main.dir/shadersUtil.cpp.o -c /home/iotaaryan/Documents/CGAssignments/Assignment1/shadersUtil.cpp
 
 CMakeFiles/main.dir/shadersUtil.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/main.dir/shadersUtil.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/shadersUtil.cpp > CMakeFiles/main.dir/shadersUtil.cpp.i
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/iotaaryan/Documents/CGAssignments/Assignment1/shadersUtil.cpp > CMakeFiles/main.dir/shadersUtil.cpp.i
 
 CMakeFiles/main.dir/shadersUtil.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/main.dir/shadersUtil.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/shadersUtil.cpp -o CMakeFiles/main.dir/shadersUtil.cpp.s
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/iotaaryan/Documents/CGAssignments/Assignment1/shadersUtil.cpp -o CMakeFiles/main.dir/shadersUtil.cpp.s
 
 CMakeFiles/main.dir/shapeUtil.cpp.o: CMakeFiles/main.dir/flags.make
-CMakeFiles/main.dir/shapeUtil.cpp.o: /home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/shapeUtil.cpp
+CMakeFiles/main.dir/shapeUtil.cpp.o: /home/iotaaryan/Documents/CGAssignments/Assignment1/shapeUtil.cpp
 CMakeFiles/main.dir/shapeUtil.cpp.o: CMakeFiles/main.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/main.dir/shapeUtil.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/main.dir/shapeUtil.cpp.o -MF CMakeFiles/main.dir/shapeUtil.cpp.o.d -o CMakeFiles/main.dir/shapeUtil.cpp.o -c /home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/shapeUtil.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/iotaaryan/Documents/CGAssignments/Assignment1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/main.dir/shapeUtil.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/main.dir/shapeUtil.cpp.o -MF CMakeFiles/main.dir/shapeUtil.cpp.o.d -o CMakeFiles/main.dir/shapeUtil.cpp.o -c /home/iotaaryan/Documents/CGAssignments/Assignment1/shapeUtil.cpp
 
 CMakeFiles/main.dir/shapeUtil.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/main.dir/shapeUtil.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/shapeUtil.cpp > CMakeFiles/main.dir/shapeUtil.cpp.i
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/iotaaryan/Documents/CGAssignments/Assignment1/shapeUtil.cpp > CMakeFiles/main.dir/shapeUtil.cpp.i
 
 CMakeFiles/main.dir/shapeUtil.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/main.dir/shapeUtil.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/shapeUtil.cpp -o CMakeFiles/main.dir/shapeUtil.cpp.s
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/iotaaryan/Documents/CGAssignments/Assignment1/shapeUtil.cpp -o CMakeFiles/main.dir/shapeUtil.cpp.s
 
 # Object files for target main
 main_OBJECTS = \
@@ -132,7 +132,7 @@ main: /usr/lib/x86_64-linux-gnu/libGL.so
 main: /usr/lib/x86_64-linux-gnu/libGLEW.so
 main: /usr/lib/x86_64-linux-gnu/libglfw.so.3.4
 main: CMakeFiles/main.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Linking CXX executable main"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/iotaaryan/Documents/CGAssignments/Assignment1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Linking CXX executable main"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/main.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
@@ -144,6 +144,6 @@ CMakeFiles/main.dir/clean:
 .PHONY : CMakeFiles/main.dir/clean
 
 CMakeFiles/main.dir/depend:
-	cd /home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1 /home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1 /home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/build /home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/build /home/sujit/CS5024/Computer-Graphics-Assignments/Assignment1/build/CMakeFiles/main.dir/DependInfo.cmake "--color=$(COLOR)" main
+	cd /home/iotaaryan/Documents/CGAssignments/Assignment1/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/iotaaryan/Documents/CGAssignments/Assignment1 /home/iotaaryan/Documents/CGAssignments/Assignment1 /home/iotaaryan/Documents/CGAssignments/Assignment1/build /home/iotaaryan/Documents/CGAssignments/Assignment1/build /home/iotaaryan/Documents/CGAssignments/Assignment1/build/CMakeFiles/main.dir/DependInfo.cmake "--color=$(COLOR)" main
 .PHONY : CMakeFiles/main.dir/depend
 
