@@ -105,6 +105,37 @@ GLuint createShaderProgram()
     return program;
 }
 
+void processInput(GLFWwindow* window,glm::vec3& cameraPos,float deltaTime)
+{
+    float speed = 2.0f * deltaTime;
+
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+    {
+        glfwSetWindowShouldClose(window, true);
+    }
+
+    // Move camera along X.
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+        cameraPos.x -= speed;
+
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+        cameraPos.x += speed;
+
+    // Move camera along Y.
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+        cameraPos.y += speed;
+
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+        cameraPos.y -= speed;
+
+    // Move camera along Z.
+    if (glfwGetKey(window, GLFW_KEY_LEFT_BRACKET) == GLFW_PRESS)
+        cameraPos.z -= speed;
+
+    if (glfwGetKey(window, GLFW_KEY_RIGHT_BRACKET) == GLFW_PRESS)
+        cameraPos.z += speed;
+}
+
 void generateSphere(float radius, int stacks, int sectors)
 {
     vertices.clear();
@@ -233,6 +264,13 @@ int main(){
 
     GLuint shaderProgram = createShaderProgram();
 
+    // rotation part
+    float earthRotation = 0.0f;
+    float rotationSpeed = 30.0f;  // Degrees per second
+
+    float cameraSpeed = 2.0f;
+    float lastFrame = 0.0f;
+
     while (!glfwWindowShouldClose(window))
     {
         glClearColor(0.02f, 0.02f, 0.08f, 1.0f);
@@ -244,7 +282,16 @@ int main(){
 
         glUseProgram(shaderProgram);
 
+        float currentFrame = static_cast<float>(glfwGetTime());
+
+        float deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        processInput(window, cameraPos, deltaTime);
+
+        earthRotation += rotationSpeed * deltaTime;
         glm::mat4 model(1.0f);
+        model = glm::rotate(model,glm::radians(earthRotation),glm::vec3(0.0f, 1.0f, 0.0f));
 
         glm::mat4 view = glm::lookAt(
             cameraPos,
