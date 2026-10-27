@@ -240,13 +240,20 @@ void generateSphere(float radius, int stacks, int sectors)
             float y = radius * cos(theta);
             float z = radius * sin(theta) * sin(phi);
 
+            vertices.push_back(x);
+            vertices.push_back(y);
+            vertices.push_back(z);
+
+            // Surface normal (unit vector)
+            vertices.push_back(x / radius);
+            vertices.push_back(y / radius);
+            vertices.push_back(z / radius);
+
             // Texture coordinates: U = longitude, V = latitude.
             float u = 1.0f - static_cast<float>(j) / sectors;
             float v = 1.0f - static_cast<float>(i) / stacks;
 
-            vertices.push_back(x);
-            vertices.push_back(y);
-            vertices.push_back(z);
+            
             vertices.push_back(u);
             vertices.push_back(v);
         }
@@ -334,23 +341,28 @@ int main(){
         GL_STATIC_DRAW
     );
 
-    // Each vertex has 5 floats: x, y, z,u,v.
+    // Each vertex has 8 floats: x, y, z, 3 normal,u,v.
     glVertexAttribPointer(
         0,
         3,
         GL_FLOAT,
         GL_FALSE,
-        5 * sizeof(float),
+        8 * sizeof(float),
         (void*)0
     );
     glEnableVertexAttribArray(0);
 
     glVertexAttribPointer(
-            1, 2, GL_FLOAT, GL_FALSE,
-            5 * sizeof(float),
+            1, 3, GL_FLOAT, GL_FALSE,
+            8 * sizeof(float),
             (void*)(3 * sizeof(float)));
 
     glEnableVertexAttribArray(1);
+    glVertexAttribPointer(
+        2, 2, GL_FLOAT, GL_FALSE,
+        8 * sizeof(float), (void*)(6 * sizeof(float))
+    );
+    glEnableVertexAttribArray(2);
     glBindVertexArray(0);
 
     // Load Earth's image into an OpenGL texture.
@@ -360,6 +372,8 @@ int main(){
         GLuint shaderProgram = createShaderProgram();
 
         glUseProgram(shaderProgram);
+        glUniform3f(
+        glGetUniformLocation(shaderProgram, "lightPos"), 3.0f, 2.0f, 3.0f);
         glUniform1i(
             glGetUniformLocation(shaderProgram, "earthTexture"), 0);
 
