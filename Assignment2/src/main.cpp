@@ -4,6 +4,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 #include <cmath>
 #include <iostream>
@@ -12,6 +14,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <stdexcept>
 
 using namespace std;
 
@@ -105,7 +108,80 @@ GLuint createShaderProgram()
     return program;
 }
 
-void processInput(GLFWwindow* window,glm::vec3& cameraPos,float deltaTime)
+GLuint loadEarthTexture(const char* path)
+{
+    int width, height, channels;
+
+    // Keep image orientation consistent with the UV coordinates.
+    stbi_set_flip_vertically_on_load(true);
+
+    unsigned char* image = stbi_load(
+        path, &width, &height, &channels, 0);
+
+    if (!image)
+        throw runtime_error(
+            string("Cannot load Earth texture: ") + path +
+            "\n" + stbi_failure_reason());
+
+    cout << "Earth texture: " << width << " x " << height
+         << ", channels: " << channels << endl;
+
+    GLenum format = GL_RGB;
+
+    if (channels == 1)
+        format = GL_RED;
+    else if (channels == 3)
+        format = GL_RGB;
+    else if (channels == 4)
+        format = GL_RGBA;
+    else
+    {
+        stbi_image_free(image);
+        throw runtime_error("Unsupported Earth texture format");
+    }
+
+    GLuint texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    // Avoid incorrect row alignment for RGB images.
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+    glTexImage2D(
+        GL_TEXTURE_2D,
+        0,
+        format,
+        width,
+        height,
+        0,
+        format,
+        GL_UNSIGNED_BYTE,
+        image
+    );
+
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    glTexParameteri(
+        GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+
+    glTexParameteri(
+        GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glTexParameteri(
+        GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+        GL_LINEAR_MIPMAP_LINEAR);
+
+    glTexParameteri(
+        GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    stbi_image_free(image);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+
+    return texture;
+}
+void processInput(GLFWwindow* window,glm::vec3& cameraPos,float deltaTime, float& earthRotation)
 {
     float speed = 2.0f * deltaTime;
 
@@ -134,6 +210,16 @@ void processInput(GLFWwindow* window,glm::vec3& cameraPos,float deltaTime)
 
     if (glfwGetKey(window, GLFW_KEY_RIGHT_BRACKET) == GLFW_PRESS)
         cameraPos.z += speed;
+
+    //Earth Rotation.
+    float manualSpeed = 90.0f * deltaTime;
+
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        earthRotation -= manualSpeed;
+
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        earthRotation += manualSpeed;
+
 }
 
 void generateSphere(float radius, int stacks, int sectors)
@@ -154,9 +240,15 @@ void generateSphere(float radius, int stacks, int sectors)
             float y = radius * cos(theta);
             float z = radius * sin(theta) * sin(phi);
 
+            // Texture coordinates: U = longitude, V = latitude.
+            float u = 1.0f - static_cast<float>(j) / sectors;
+            float v = 1.0f - static_cast<float>(i) / stacks;
+
             vertices.push_back(x);
             vertices.push_back(y);
             vertices.push_back(z);
+            vertices.push_back(u);
+            vertices.push_back(v);
         }
     }
 
@@ -242,27 +334,41 @@ int main(){
         GL_STATIC_DRAW
     );
 
-    // Each vertex has three floats: x, y, z.
+    // Each vertex has 5 floats: x, y, z,u,v.
     glVertexAttribPointer(
         0,
         3,
         GL_FLOAT,
         GL_FALSE,
-        3 * sizeof(float),
+        5 * sizeof(float),
         (void*)0
     );
-
     glEnableVertexAttribArray(0);
 
+    glVertexAttribPointer(
+            1, 2, GL_FLOAT, GL_FALSE,
+            5 * sizeof(float),
+            (void*)(3 * sizeof(float)));
+
+    glEnableVertexAttribArray(1);
     glBindVertexArray(0);
+
+    // Load Earth's image into an OpenGL texture.
+        GLuint earthTexture = loadEarthTexture(
+            "textures/earth.jpg");
+
+        GLuint shaderProgram = createShaderProgram();
+
+        glUseProgram(shaderProgram);
+        glUniform1i(
+            glGetUniformLocation(shaderProgram, "earthTexture"), 0);
+
 
     glm::vec3 cameraPos(0.0f, 0.0f, 4.0f);
     // glm::mat4 view = glm::lookAt(cameraPos,glm::vec3(0.0f, 0.0f, 0.0f),glm::vec3(0.0f, 1.0f, 0.0f));
     // glm::mat4 projection = glm::perspective(glm::radians(45.0f),800.0f / 600.0f,0.1f,1000.0f);
 
     glEnable(GL_DEPTH_TEST);
-
-    GLuint shaderProgram = createShaderProgram();
 
     // rotation part
     float earthRotation = 0.0f;
@@ -287,7 +393,7 @@ int main(){
         float deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
-        processInput(window, cameraPos, deltaTime);
+        processInput(window, cameraPos, deltaTime, earthRotation);
 
         earthRotation += rotationSpeed * deltaTime;
         glm::mat4 model(1.0f);
@@ -301,11 +407,11 @@ int main(){
 
         glm::mat4 projection = glm::perspective(
             glm::radians(45.0f),
-            800.0f / 600.0f,
+            800.0f / 800.0f,
             0.1f,
             1000.0f
         );
-
+        glUseProgram(shaderProgram);
         glUniformMatrix4fv(
             glGetUniformLocation(shaderProgram, "model"),
             1, GL_FALSE, glm::value_ptr(model)
@@ -320,6 +426,9 @@ int main(){
             glGetUniformLocation(shaderProgram, "projection"),
             1, GL_FALSE, glm::value_ptr(projection)
         );
+        // Bind the Earth texture to texture unit 0.
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, earthTexture);
 
         glBindVertexArray(VAO);
 
@@ -337,6 +446,7 @@ int main(){
     }
 
     // Cleanup before exiting.
+    glDeleteTextures(1, &earthTexture);
     glDeleteProgram(shaderProgram);
 
     glDeleteBuffers(1, &VBO);
