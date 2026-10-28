@@ -64,10 +64,10 @@ GLuint compileShader(GLenum type, const string& source)
     return shader;
 }
 
-GLuint createShaderProgram()
-{
-    string vertexSource = readFile("shaders/vertex.glsl");
-    string fragmentSource = readFile("shaders/fragment.glsl");
+GLuint createShaderProgram(const string& vertexPath, const string& fragmentPath)
+    {
+    string vertexSource = readFile(vertexPath);
+    string fragmentSource = readFile(fragmentPath);
 
     GLuint vertexShader = compileShader(
         GL_VERTEX_SHADER, vertexSource
@@ -219,6 +219,8 @@ void processInput(GLFWwindow* window,glm::vec3& cameraPos,float deltaTime, float
 
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         earthRotation += manualSpeed;
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, true);
 
 }
 
@@ -308,6 +310,9 @@ int main(){
     }   
 
     glEnable(GL_DEPTH_TEST);
+    // Enable transparency for the atmosphere
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glLineWidth(2.0f);
     glViewport(0,0,800,800);
 
@@ -369,7 +374,15 @@ int main(){
         GLuint earthTexture = loadEarthTexture(
             "textures/earth.jpg");
 
-        GLuint shaderProgram = createShaderProgram();
+        GLuint shaderProgram = createShaderProgram(
+            "shaders/vertex.glsl",
+            "shaders/fragment.glsl"
+        );
+
+        GLuint atmosphereProgram = createShaderProgram(
+            "shaders/atmosphere_vertex.glsl",
+            "shaders/atmosphere_fragment.glsl"
+        );
 
         glUseProgram(shaderProgram);
         glUniform3f(
@@ -440,11 +453,47 @@ int main(){
             glGetUniformLocation(shaderProgram, "projection"),
             1, GL_FALSE, glm::value_ptr(projection)
         );
-        // Bind the Earth texture to texture unit 0.
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, earthTexture);
+
+        // 1. Draw the atmosphere first
+        glUseProgram(atmosphereProgram);
+
+        glm::mat4 atmosphereModel =
+            glm::scale(model, glm::vec3(1.04f));
+
+        glUniformMatrix4fv(
+            glGetUniformLocation(atmosphereProgram, "model"),
+            1, GL_FALSE, glm::value_ptr(atmosphereModel));
+
+        glUniformMatrix4fv(
+            glGetUniformLocation(atmosphereProgram, "view"),
+            1, GL_FALSE, glm::value_ptr(view));
+
+        glUniformMatrix4fv(
+            glGetUniformLocation(atmosphereProgram, "projection"),
+            1, GL_FALSE, glm::value_ptr(projection));
+
+        glUniform3fv(
+            glGetUniformLocation(atmosphereProgram, "cameraPos"),
+            1, glm::value_ptr(cameraPos));
 
         glBindVertexArray(VAO);
+
+        // Don't write atmosphere depth into the depth buffer
+
+        glDepthMask(GL_FALSE);
+
+        glDrawElements(
+            GL_TRIANGLES,
+            static_cast<GLsizei>(indices.size()),
+            GL_UNSIGNED_INT,
+            nullptr
+        );
+        glDepthMask(GL_TRUE);
+
+        // Bind the Earth texture to texture unit 0.
+        glUseProgram(shaderProgram);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, earthTexture);
 
         glDrawElements(
             GL_TRIANGLES,
@@ -462,6 +511,7 @@ int main(){
     // Cleanup before exiting.
     glDeleteTextures(1, &earthTexture);
     glDeleteProgram(shaderProgram);
+    glDeleteProgram(atmosphereProgram);
 
     glDeleteBuffers(1, &VBO);
     glDeleteBuffers(1, &EBO);
