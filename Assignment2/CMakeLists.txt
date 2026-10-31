@@ -11,5 +11,5 @@ find_package(glfw3 REQUIRED)
 
 add_executable(a2-model-0 src/main.cpp)
 
-target_include_directories(a2-model-0 PRIVATE ${CMAKE_SOURCE_DIR}/../../glm)
+target_include_directories(a2-model-0 PRIVATE ${CMAKE_SOURCE_DIR}/glm)
 target_link_libraries(a2-model-0 PRIVATE OpenGL::GL GLEW::GLEW glfw)
