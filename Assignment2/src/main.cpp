@@ -4,59 +4,57 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-#include <cmath>
-#include <iostream>
-#include <vector>
+#include "common/Mesh.h"
+#include "models/Cube.h"
+#include "models/Plane.h"
 
+#include <cmath>
 #include <fstream>
+#include <iostream>
+#include <memory>
 #include <sstream>
-#include <string>
 #include <stdexcept>
+#include <string>
+#include <vector>
 
 using namespace std;
 
 const float PI = 3.14159265359f;
 
+// Sphere vertices: position (3), normal (3), texture coordinates (2).
 vector<float> vertices;
 vector<unsigned int> indices;
 
 string readFile(const string& path)
 {
     ifstream file(path);
-
     if (!file.is_open())
-    {
         throw runtime_error("Cannot open shader: " + path);
-    }
 
     stringstream buffer;
     buffer << file.rdbuf();
-
     return buffer.str();
 }
 
 GLuint compileShader(GLenum type, const string& source)
 {
     GLuint shader = glCreateShader(type);
-
     const char* src = source.c_str();
     glShaderSource(shader, 1, &src, nullptr);
     glCompileShader(shader);
 
-    GLint success;
+    GLint success = GL_FALSE;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
 
     if (!success)
     {
         char log[1024];
-        glGetShaderInfoLog(shader, 1024, nullptr, log);
-
-        cerr << "Shader compilation error:\n"
-             << log << endl;
-
+        glGetShaderInfoLog(shader, sizeof(log), nullptr, log);
+        cerr << "Shader compilation error:\n" << log << '\n';
         glDeleteShader(shader);
         throw runtime_error("Shader compilation failed");
     }
@@ -65,69 +63,46 @@ GLuint compileShader(GLenum type, const string& source)
 }
 
 GLuint createShaderProgram(const string& vertexPath, const string& fragmentPath)
-    {
-    string vertexSource = readFile(vertexPath);
-    string fragmentSource = readFile(fragmentPath);
-
-    GLuint vertexShader = compileShader(
-        GL_VERTEX_SHADER, vertexSource
-    );
-
-    GLuint fragmentShader = compileShader(
-        GL_FRAGMENT_SHADER, fragmentSource
-    );
+{
+    GLuint vertexShader = compileShader(GL_VERTEX_SHADER, readFile(vertexPath));
+    GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, readFile(fragmentPath));
 
     GLuint program = glCreateProgram();
-
     glAttachShader(program, vertexShader);
     glAttachShader(program, fragmentShader);
-
     glLinkProgram(program);
 
-    GLint success;
+    GLint success = GL_FALSE;
     glGetProgramiv(program, GL_LINK_STATUS, &success);
+
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
 
     if (!success)
     {
         char log[1024];
-        glGetProgramInfoLog(program, 1024, nullptr, log);
-
-        cerr << "Shader linking error:\n"
-             << log << endl;
-
-        glDeleteShader(vertexShader);
-        glDeleteShader(fragmentShader);
+        glGetProgramInfoLog(program, sizeof(log), nullptr, log);
+        cerr << "Shader linking error:\n" << log << '\n';
         glDeleteProgram(program);
-
         throw runtime_error("Shader linking failed");
     }
-
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
 
     return program;
 }
 
 GLuint loadEarthTexture(const char* path)
 {
-    int width, height, channels;
-
-    // Keep image orientation consistent with the UV coordinates.
+    int width = 0, height = 0, channels = 0;
     stbi_set_flip_vertically_on_load(true);
 
-    unsigned char* image = stbi_load(
-        path, &width, &height, &channels, 0);
-
+    unsigned char* image = stbi_load(path, &width, &height, &channels, 0);
     if (!image)
-        throw runtime_error(
-            string("Cannot load Earth texture: ") + path +
-            "\n" + stbi_failure_reason());
-
-    cout << "Earth texture: " << width << " x " << height
-         << ", channels: " << channels << endl;
+    {
+        throw runtime_error(string("Cannot load Earth texture: ") + path +
+                            "\n" + stbi_failure_reason());
+    }
 
     GLenum format = GL_RGB;
-
     if (channels == 1)
         format = GL_RED;
     else if (channels == 3)
@@ -140,88 +115,69 @@ GLuint loadEarthTexture(const char* path)
         throw runtime_error("Unsupported Earth texture format");
     }
 
-    GLuint texture;
+    GLuint texture = 0;
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
 
-    // Avoid incorrect row alignment for RGB images.
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-
-    glTexImage2D(
-        GL_TEXTURE_2D,
-        0,
-        format,
-        width,
-        height,
-        0,
-        format,
-        GL_UNSIGNED_BYTE,
-        image
-    );
-
+    glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0,
+                 format, GL_UNSIGNED_BYTE, image);
     glGenerateMipmap(GL_TEXTURE_2D);
 
-    glTexParameteri(
-        GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-
-    glTexParameteri(
-        GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-    glTexParameteri(
-        GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-        GL_LINEAR_MIPMAP_LINEAR);
-
-    glTexParameteri(
-        GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     stbi_image_free(image);
-
     glBindTexture(GL_TEXTURE_2D, 0);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 
+    cout << "Loaded Earth texture: " << width << " x " << height
+         << ", channels: " << channels << '\n';
     return texture;
 }
-void processInput(GLFWwindow* window,glm::vec3& cameraPos,float deltaTime, float& earthRotation)
+
+void setMatrixUniforms(GLuint program,
+                       const glm::mat4& model,
+                       const glm::mat4& view,
+                       const glm::mat4& projection)
 {
-    float speed = 2.0f * deltaTime;
+    glUseProgram(program);
+    glUniformMatrix4fv(glGetUniformLocation(program, "model"),
+                       1, GL_FALSE, glm::value_ptr(model));
+    glUniformMatrix4fv(glGetUniformLocation(program, "view"),
+                       1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(glGetUniformLocation(program, "projection"),
+                       1, GL_FALSE, glm::value_ptr(projection));
+}
+
+void processInput(GLFWwindow* window, glm::vec3& cameraPos,
+                  float deltaTime, float& earthRotation)
+{
+    const float moveSpeed = 2.0f * deltaTime;
+    const float rotationSpeed = 90.0f * deltaTime;
 
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-    {
         glfwSetWindowShouldClose(window, true);
-    }
 
-    // Move camera along X.
     if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
-        cameraPos.x -= speed;
-
+        cameraPos.x -= moveSpeed;
     if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
-        cameraPos.x += speed;
-
-    // Move camera along Y.
+        cameraPos.x += moveSpeed;
     if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
-        cameraPos.y += speed;
-
+        cameraPos.y += moveSpeed;
     if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
-        cameraPos.y -= speed;
-
-    // Move camera along Z.
+        cameraPos.y -= moveSpeed;
     if (glfwGetKey(window, GLFW_KEY_LEFT_BRACKET) == GLFW_PRESS)
-        cameraPos.z -= speed;
-
+        cameraPos.z -= moveSpeed;
     if (glfwGetKey(window, GLFW_KEY_RIGHT_BRACKET) == GLFW_PRESS)
-        cameraPos.z += speed;
-
-    //Earth Rotation.
-    float manualSpeed = 90.0f * deltaTime;
+        cameraPos.z += moveSpeed;
 
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        earthRotation -= manualSpeed;
-
+        earthRotation -= rotationSpeed;
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        earthRotation += manualSpeed;
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, true);
-
+        earthRotation += rotationSpeed;
 }
 
 void generateSphere(float radius, int stacks, int sectors)
@@ -229,48 +185,40 @@ void generateSphere(float radius, int stacks, int sectors)
     vertices.clear();
     indices.clear();
 
-    // Generate the sphere's vertices.
-    for (int i = 0; i <= stacks; i++)
+    for (int i = 0; i <= stacks; ++i)
     {
-        float theta = PI * i / stacks;
+        const float theta = PI * static_cast<float>(i) / stacks;
 
-        for (int j = 0; j <= sectors; j++)
+        for (int j = 0; j <= sectors; ++j)
         {
-            float phi = 2.0f * PI * j / sectors;
+            const float phi = 2.0f * PI * static_cast<float>(j) / sectors;
 
-            float x = radius * sin(theta) * cos(phi);
-            float y = radius * cos(theta);
-            float z = radius * sin(theta) * sin(phi);
+            const float x = radius * sin(theta) * cos(phi);
+            const float y = radius * cos(theta);
+            const float z = radius * sin(theta) * sin(phi);
 
+            // Position
             vertices.push_back(x);
             vertices.push_back(y);
             vertices.push_back(z);
 
-            // Surface normal (unit vector)
+            // Normal
             vertices.push_back(x / radius);
             vertices.push_back(y / radius);
             vertices.push_back(z / radius);
 
-            // Texture coordinates: U = longitude, V = latitude.
-            float u = 1.0f - static_cast<float>(j) / sectors;
-            float v = 1.0f - static_cast<float>(i) / stacks;
-
-            
-            vertices.push_back(u);
-            vertices.push_back(v);
+            // Texture coordinates
+            vertices.push_back(1.0f - static_cast<float>(j) / sectors);
+            vertices.push_back(1.0f - static_cast<float>(i) / stacks);
         }
     }
 
-    // Connect neighbouring vertices to form triangles.
-    for (int i = 0; i < stacks; i++)
+    for (int i = 0; i < stacks; ++i)
     {
-        for (int j = 0; j < sectors; j++)
+        for (int j = 0; j < sectors; ++j)
         {
-            unsigned int first =
-                i * (sectors + 1) + j;
-
-            unsigned int second =
-                first + sectors + 1;
+            const unsigned int first = i * (sectors + 1) + j;
+            const unsigned int second = first + sectors + 1;
 
             indices.push_back(first);
             indices.push_back(second);
@@ -283,243 +231,216 @@ void generateSphere(float radius, int stacks, int sectors)
     }
 }
 
-int main(){
+int main()
+{
     glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
 
-    if(!glfwInit()){
-       return -1;
+    if (!glfwInit())
+    {
+        cerr << "Failed to initialize GLFW\n";
+        return -1;
     }
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    
-    GLFWwindow* window = glfwCreateWindow(800,800,"Assignment-2",NULL,NULL);
 
-    if(window==NULL){
+    GLFWwindow* window = glfwCreateWindow(1000, 800, "Assignment 2 - Earth and Cube",
+                                          nullptr, nullptr);
+    if (!window)
+    {
+        cerr << "Failed to create GLFW window\n";
         glfwTerminate();
         return -1;
     }
-    
-    glfwMakeContextCurrent(window);
 
+    glfwMakeContextCurrent(window);
     glewExperimental = GL_TRUE;
-    if(glewInit()!=GLEW_OK){
+
+    if (glewInit() != GLEW_OK)
+    {
+        cerr << "Failed to initialize GLEW\n";
+        glfwDestroyWindow(window);
         glfwTerminate();
         return -1;
-    }   
+    }
 
     glEnable(GL_DEPTH_TEST);
-    // Enable transparency for the atmosphere
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glLineWidth(2.0f);
-    glViewport(0,0,800,800);
 
-    GLuint VAO, VBO, EBO;
+    GLuint earthTexture = 0;
+    GLuint earthProgram = 0;
+    GLuint atmosphereProgram = 0;
+    GLuint cubeProgram = 0;
 
-    generateSphere(1.0f, 40, 40);
-
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
-
-    glBindVertexArray(VAO);
-
-    // Upload vertex positions.
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-
-    glBufferData(
-        GL_ARRAY_BUFFER,
-        vertices.size() * sizeof(float),
-        vertices.data(),
-        GL_STATIC_DRAW
-    );
-
-    // Upload triangle indices.
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-
-    glBufferData(
-        GL_ELEMENT_ARRAY_BUFFER,
-        indices.size() * sizeof(unsigned int),
-        indices.data(),
-        GL_STATIC_DRAW
-    );
-
-    // Each vertex has 8 floats: x, y, z, 3 normal,u,v.
-    glVertexAttribPointer(
-        0,
-        3,
-        GL_FLOAT,
-        GL_FALSE,
-        8 * sizeof(float),
-        (void*)0
-    );
-    glEnableVertexAttribArray(0);
-
-    glVertexAttribPointer(
-            1, 3, GL_FLOAT, GL_FALSE,
-            8 * sizeof(float),
-            (void*)(3 * sizeof(float)));
-
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(
-        2, 2, GL_FLOAT, GL_FALSE,
-        8 * sizeof(float), (void*)(6 * sizeof(float))
-    );
-    glEnableVertexAttribArray(2);
-    glBindVertexArray(0);
-
-    // Load Earth's image into an OpenGL texture.
-        GLuint earthTexture = loadEarthTexture(
-            "textures/earth.jpg");
-
-        GLuint shaderProgram = createShaderProgram(
-            "shaders/vertex.glsl",
-            "shaders/fragment.glsl"
-        );
-
-        GLuint atmosphereProgram = createShaderProgram(
-            "shaders/atmosphere_vertex.glsl",
-            "shaders/atmosphere_fragment.glsl"
-        );
-
-        glUseProgram(shaderProgram);
-        glUniform3f(
-        glGetUniformLocation(shaderProgram, "lightPos"), 3.0f, 2.0f, 3.0f);
-        glUniform1i(
-            glGetUniformLocation(shaderProgram, "earthTexture"), 0);
-
-
-    glm::vec3 cameraPos(0.0f, 0.0f, 4.0f);
-    // glm::mat4 view = glm::lookAt(cameraPos,glm::vec3(0.0f, 0.0f, 0.0f),glm::vec3(0.0f, 1.0f, 0.0f));
-    // glm::mat4 projection = glm::perspective(glm::radians(45.0f),800.0f / 600.0f,0.1f,1000.0f);
-
-    glEnable(GL_DEPTH_TEST);
-
-    // rotation part
-    float earthRotation = 0.0f;
-    float rotationSpeed = 30.0f;  // Degrees per second
-
-    float cameraSpeed = 2.0f;
-    float lastFrame = 0.0f;
-
-    while (!glfwWindowShouldClose(window))
+    try
     {
-        glClearColor(0.02f, 0.02f, 0.08f, 1.0f);
+        generateSphere(1.0f, 40, 40);
+        auto earthMesh = make_unique<Mesh>(vertices, indices);
 
-        glClear(
-            GL_COLOR_BUFFER_BIT |
-            GL_DEPTH_BUFFER_BIT
-        );
+        // Cube owns its own Mesh. Cube geometry uses the same 8-float vertex
+        // layout as Earth: position, normal, UV.
+        auto testCube = make_unique<Cube>();
+        auto ground = make_unique<Plane>();
 
-        glUseProgram(shaderProgram);
+        earthTexture = loadEarthTexture("textures/earth.jpg");
+        earthProgram = createShaderProgram("shaders/vertex.glsl",
+                                           "shaders/fragment.glsl");
+        atmosphereProgram = createShaderProgram("shaders/atmosphere_vertex.glsl",
+                                                "shaders/atmosphere_fragment.glsl");
+        cubeProgram = createShaderProgram(
+                                            "shaders/cube_vertex.glsl",
+                                            "shaders/cube_fragment.glsl"
+                                        );
 
-        float currentFrame = static_cast<float>(glfwGetTime());
+        glUseProgram(earthProgram);
+        glUniform3f(glGetUniformLocation(earthProgram, "lightPos"), 3.0f, 2.0f, 3.0f);
+        glUniform1i(glGetUniformLocation(earthProgram, "earthTexture"), 0);
 
-        float deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
+        glm::vec3 cameraPos(0.0f, 0.0f, 5.0f);
+        float earthRotation = 0.0f;
+        float lastFrame = static_cast<float>(glfwGetTime());
 
-        processInput(window, cameraPos, deltaTime, earthRotation);
+        while (!glfwWindowShouldClose(window))
+        {
+            const float currentFrame = static_cast<float>(glfwGetTime());
+            const float deltaTime = currentFrame - lastFrame;
+            lastFrame = currentFrame;
 
-        earthRotation += rotationSpeed * deltaTime;
-        glm::mat4 model(1.0f);
-        model = glm::rotate(model,glm::radians(earthRotation),glm::vec3(0.0f, 1.0f, 0.0f));
+            processInput(window, cameraPos, deltaTime, earthRotation);
 
-        glm::mat4 view = glm::lookAt(
-            cameraPos,
-            glm::vec3(0.0f, 0.0f, 0.0f),
-            glm::vec3(0.0f, 1.0f, 0.0f)
-        );
+            glClearColor(0.02f, 0.02f, 0.08f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glm::mat4 projection = glm::perspective(
-            glm::radians(45.0f),
-            800.0f / 800.0f,
-            0.1f,
-            1000.0f
-        );
-        glUseProgram(shaderProgram);
-        glUniformMatrix4fv(
-            glGetUniformLocation(shaderProgram, "model"),
-            1, GL_FALSE, glm::value_ptr(model)
-        );
+            int width = 0, height = 0;
+            glfwGetFramebufferSize(window, &width, &height);
+            if (height == 0)
+                height = 1;
+            glViewport(0, 0, width, height);
 
-        glUniformMatrix4fv(
-            glGetUniformLocation(shaderProgram, "view"),
-            1, GL_FALSE, glm::value_ptr(view)
-        );
+            const glm::mat4 view = glm::lookAt(
+                cameraPos, glm::vec3(0.0f),
+                glm::vec3(0.0f, 1.0f, 0.0f));
 
-        glUniformMatrix4fv(
-            glGetUniformLocation(shaderProgram, "projection"),
-            1, GL_FALSE, glm::value_ptr(projection)
-        );
+            const glm::mat4 projection = glm::perspective(
+                glm::radians(45.0f),
+                static_cast<float>(width) / static_cast<float>(height),
+                0.1f, 1000.0f);
 
-        // 1. Draw the atmosphere first
-        glUseProgram(atmosphereProgram);
+            const glm::mat4 earthModel = glm::rotate(
+                glm::mat4(1.0f), glm::radians(earthRotation),
+                glm::vec3(0.0f, 1.0f, 0.0f));
 
-        glm::mat4 atmosphereModel =
-            glm::scale(model, glm::vec3(1.04f));
+            // Draw the atmosphere first. It uses the sphere mesh and its own shader.
+            setMatrixUniforms(atmosphereProgram,
+                              glm::scale(earthModel, glm::vec3(1.04f)),
+                              view, projection);
 
-        glUniformMatrix4fv(
-            glGetUniformLocation(atmosphereProgram, "model"),
-            1, GL_FALSE, glm::value_ptr(atmosphereModel));
+            glUniform3fv(glGetUniformLocation(atmosphereProgram, "cameraPos"),
+                         1, glm::value_ptr(cameraPos));
 
-        glUniformMatrix4fv(
-            glGetUniformLocation(atmosphereProgram, "view"),
-            1, GL_FALSE, glm::value_ptr(view));
+            glDepthMask(GL_FALSE);
+            earthMesh->draw();
+            glDepthMask(GL_TRUE);
 
-        glUniformMatrix4fv(
-            glGetUniformLocation(atmosphereProgram, "projection"),
-            1, GL_FALSE, glm::value_ptr(projection));
+            // Draw textured Earth.
+            setMatrixUniforms(earthProgram, earthModel, view, projection);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, earthTexture);
+            earthMesh->draw();
 
-        glUniform3fv(
-            glGetUniformLocation(atmosphereProgram, "cameraPos"),
-            1, glm::value_ptr(cameraPos));
+            // Draw the ground plane.
+            glm::mat4 groundModel(1.0f);
+            groundModel = glm::translate(
+                groundModel,
+                glm::vec3(0.0f, -2.0f, 0.0f)
+            );
+            setMatrixUniforms(
+                cubeProgram,
+                groundModel,
+                view,
+                projection
+            );
 
-        glBindVertexArray(VAO);
+            glUniform3f(
+                glGetUniformLocation(cubeProgram, "objectColor"),
+                0.15f, 0.25f, 0.15f
+            );
 
-        // Don't write atmosphere depth into the depth buffer
+            glUniform3f(
+                glGetUniformLocation(cubeProgram, "lightPos"),
+                3.0f, 2.0f, 3.0f
+            );
 
-        glDepthMask(GL_FALSE);
+            ground->draw();
 
-        glDrawElements(
-            GL_TRIANGLES,
-            static_cast<GLsizei>(indices.size()),
-            GL_UNSIGNED_INT,
-            nullptr
-        );
-        glDepthMask(GL_TRUE);
+            // Draw the cube using its own untextured shader.
+            glm::mat4 cubeModel(1.0f);
 
-        // Bind the Earth texture to texture unit 0.
-        glUseProgram(shaderProgram);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, earthTexture);
+            cubeModel = glm::translate(
+                cubeModel,
+                glm::vec3(1.5f, -1.5f, 0.0f)
+            );
 
-        glDrawElements(
-            GL_TRIANGLES,
-            static_cast<GLsizei>(indices.size()),
-            GL_UNSIGNED_INT,
-            nullptr
-        );
+            cubeModel = glm::rotate(
+                cubeModel,
+                glm::radians(20.0f),
+                glm::vec3(0.0f, 1.0f, 0.0f)
+            );
 
-        glBindVertexArray(0);
+            cubeModel = glm::scale(
+                cubeModel,
+                glm::vec3(0.8f)
+            );
 
-        glfwSwapBuffers(window);
-        glfwPollEvents();
+            // Set the cube's transformation matrices.
+            setMatrixUniforms(
+                cubeProgram,
+                cubeModel,
+                view,
+                projection
+            );
+
+            // Set the cube's color and light position.
+            glUniform3f(
+                glGetUniformLocation(cubeProgram, "objectColor"),
+                0.8f, 0.3f, 0.2f
+            );
+
+            glUniform3f(
+                glGetUniformLocation(cubeProgram, "lightPos"),
+                3.0f, 2.0f, 3.0f
+            );
+
+            // Draw the cube.
+            testCube->draw();
+
+            glBindTexture(GL_TEXTURE_2D, 0);
+
+            glfwSwapBuffers(window);
+            glfwPollEvents();
+        }
+
+        // Destroy mesh-owning objects before destroying the OpenGL context.
+        testCube.reset();
+        earthMesh.reset();
+    }
+    catch (const exception& e)
+    {
+        cerr << "Error: " << e.what() << '\n';
     }
 
-    // Cleanup before exiting.
-    glDeleteTextures(1, &earthTexture);
-    glDeleteProgram(shaderProgram);
-    glDeleteProgram(atmosphereProgram);
-
-    glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &EBO);
-    glDeleteVertexArrays(1, &VAO);
+    if (earthTexture)
+        glDeleteTextures(1, &earthTexture);
+    if (earthProgram)
+        glDeleteProgram(earthProgram);
+    if (atmosphereProgram)
+        glDeleteProgram(atmosphereProgram);
+    if (cubeProgram)
+        glDeleteProgram(cubeProgram);
 
     glfwDestroyWindow(window);
     glfwTerminate();
-
     return 0;
-
 }
