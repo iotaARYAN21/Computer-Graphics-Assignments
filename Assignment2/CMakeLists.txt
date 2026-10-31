@@ -32,3 +32,13 @@ target_include_directories(a2-model-1 PRIVATE
     ${CMAKE_SOURCE_DIR}/glm
 )
 target_link_libraries(a2-model-1 PRIVATE OpenGL::GL GLEW::GLEW glfw)
+
+#Executable 3: Vehicle and payload viewer
+add_executable(a2-model-2
+    src/model2/main.cpp
+    src/common/Mesh.cpp
+    src/models/Cylinder.cpp
+    src/models/Cube.cpp
+)
+target_include_directories(a2-model-2 PRIVATE ${CMAKE_SOURCE_DIR}/glm)
+target_link_libraries(a2-model-2 PRIVATE OpenGL::GL GLEW::GLEW glfw)
