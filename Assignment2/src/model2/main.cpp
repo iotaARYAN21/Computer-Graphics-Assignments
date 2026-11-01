@@ -26,7 +26,14 @@ float cameraYaw = 35.0f;
 float cameraPitch = 18.0f;
 float cameraDistance = 18.0f;
 
-string readFile(const string& path)
+// Booster separation animation.
+bool boosterSeparationStarted = false;
+double boosterSeparationStartTime = 0.0;
+// Payload fairing separation.
+bool fairingSeparationStarted = false;
+double fairingSeparationStartTime = 0.0;
+
+string readFile(const string &path)
 {
     ifstream file(path);
     if (!file)
@@ -37,10 +44,10 @@ string readFile(const string& path)
     return buffer.str();
 }
 
-GLuint compileShader(GLenum type, const string& source)
+GLuint compileShader(GLenum type, const string &source)
 {
     GLuint shader = glCreateShader(type);
-    const char* src = source.c_str();
+    const char *src = source.c_str();
     glShaderSource(shader, 1, &src, nullptr);
     glCompileShader(shader);
 
@@ -50,14 +57,15 @@ GLuint compileShader(GLenum type, const string& source)
     {
         char log[1024];
         glGetShaderInfoLog(shader, sizeof(log), nullptr, log);
-        cerr << "Shader compilation error:\n" << log << '\n';
+        cerr << "Shader compilation error:\n"
+             << log << '\n';
         glDeleteShader(shader);
         throw runtime_error("Shader compilation failed");
     }
     return shader;
 }
 
-GLuint createProgram(const string& vertexPath, const string& fragmentPath)
+GLuint createProgram(const string &vertexPath, const string &fragmentPath)
 {
     GLuint vs = compileShader(GL_VERTEX_SHADER, readFile(vertexPath));
     GLuint fs = compileShader(GL_FRAGMENT_SHADER, readFile(fragmentPath));
@@ -77,15 +85,16 @@ GLuint createProgram(const string& vertexPath, const string& fragmentPath)
     {
         char log[1024];
         glGetProgramInfoLog(program, sizeof(log), nullptr, log);
-        cerr << "Shader link error:\n" << log << '\n';
+        cerr << "Shader link error:\n"
+             << log << '\n';
         glDeleteProgram(program);
         throw runtime_error("Shader linking failed");
     }
     return program;
 }
 
-void setMatrices(GLuint program, const glm::mat4& model,
-                 const glm::mat4& view, const glm::mat4& projection)
+void setMatrices(GLuint program, const glm::mat4 &model,
+                 const glm::mat4 &view, const glm::mat4 &projection)
 {
     glUseProgram(program);
     glUniformMatrix4fv(glGetUniformLocation(program, "model"),
@@ -96,10 +105,10 @@ void setMatrices(GLuint program, const glm::mat4& model,
                        1, GL_FALSE, glm::value_ptr(projection));
 }
 
-void drawCylinder(Cylinder& cylinder, GLuint program,
-                  const glm::mat4& view, const glm::mat4& projection,
-                  const glm::vec3& position, const glm::vec3& scale,
-                  const glm::vec3& color)
+void drawCylinder(Cylinder &cylinder, GLuint program,
+                  const glm::mat4 &view, const glm::mat4 &projection,
+                  const glm::vec3 &position, const glm::vec3 &scale,
+                  const glm::vec3 &color)
 {
     glm::mat4 model(1.0f);
     model = glm::translate(model, position);
@@ -112,8 +121,50 @@ void drawCylinder(Cylinder& cylinder, GLuint program,
     cylinder.draw();
 }
 
-void drawRocket(Cylinder& cylinder, Cylinder& cone, Cube& cube, GLuint program,
-                const glm::mat4& view, const glm::mat4& projection)
+void drawRotatedCylinder(
+    Cylinder &cylinder,
+    GLuint program,
+    const glm::mat4 &view,
+    const glm::mat4 &projection,
+    const glm::vec3 &position,
+    const glm::vec3 &scale,
+    const glm::vec3 &rotationAxis,
+    float rotationAngle,
+    const glm::vec3 &color)
+{
+    glm::mat4 model(1.0f);
+
+    model = glm::translate(model, position);
+
+    model = glm::rotate(
+        model,
+        glm::radians(rotationAngle),
+        rotationAxis);
+
+    model = glm::scale(model, scale);
+
+    setMatrices(program, model, view, projection);
+
+    glUniform3f(
+        glGetUniformLocation(program, "lightPos"),
+        5.0f, 8.0f, 6.0f);
+
+    glUniform3fv(
+        glGetUniformLocation(program, "objectColor"),
+        1,
+        glm::value_ptr(color));
+
+    cylinder.draw();
+}
+
+void drawRocket(Cylinder &cylinder,
+                Cylinder &cone,
+                Cylinder &fairingHalfA,
+                Cylinder &fairingHalfB,
+                Cube &cube,
+                GLuint program,
+                const glm::mat4 &view,
+                const glm::mat4 &projection)
 {
     // PSLV-C25 inspired proportions. Model units are illustrative, not exact scale.
     // Base is y=0; vehicle is stacked vertically along +Y.
@@ -125,9 +176,9 @@ void drawRocket(Cylinder& cylinder, Cylinder& cone, Cube& cube, GLuint program,
     const glm::vec3 gold(0.82f, 0.63f, 0.18f);
 
     // Helper to draw a coloured cube at any position and size.
-    auto drawBox = [&](const glm::vec3& position,
-                    const glm::vec3& size,
-                    const glm::vec3& color)
+    auto drawBox = [&](const glm::vec3 &position,
+                       const glm::vec3 &size,
+                       const glm::vec3 &color)
     {
         glm::mat4 model(1.0f);
 
@@ -143,14 +194,12 @@ void drawRocket(Cylinder& cylinder, Cylinder& cone, Cube& cube, GLuint program,
         // Set lighting and colour.
         glUniform3f(
             glGetUniformLocation(program, "lightPos"),
-            5.0f, 8.0f, 6.0f
-        );
+            5.0f, 8.0f, 6.0f);
 
         glUniform3fv(
             glGetUniformLocation(program, "objectColor"),
             1,
-            glm::value_ptr(color)
-        );
+            glm::value_ptr(color));
 
         // Draw the cube.
         cube.draw();
@@ -192,9 +241,72 @@ void drawRocket(Cylinder& cylinder, Cylinder& cone, Cube& cube, GLuint program,
                  glm::vec3(0.62f, 0.28f, 0.62f), gold);
 
     // Payload fairing: simple pointed cone above the fourth stage.
-    drawCylinder(cone, program, view, projection,
-                 glm::vec3(0.0f, 9.05f, 0.0f),
-                 glm::vec3(1.22f, 1.55f, 1.22f), white);
+    // drawCylinder(cone, program, view, projection,
+    //              glm::vec3(0.0f, 9.05f, 0.0f),
+    //              glm::vec3(1.22f, 1.55f, 1.22f), white);
+
+    // ================= PAYLOAD FAIRING SEPARATION =================
+
+    // The fairing starts separating when F is pressed.
+    // Animation duration: 2 seconds.
+    float fairingProgress = 0.0f;
+
+    if (fairingSeparationStarted)
+    {
+        double elapsed =
+            glfwGetTime() - fairingSeparationStartTime;
+
+        fairingProgress =
+            glm::clamp(
+                static_cast<float>(elapsed / 2.0),
+                0.0f,
+                1.0f);
+    }
+
+    // Smooth the movement.
+    float fairingSmooth =
+        fairingProgress * fairingProgress *
+        (3.0f - 2.0f * fairingProgress);
+
+    // Original centre of the fairing.
+    glm::vec3 fairingPosition(0.0f, 9.05f, 0.0f);
+
+    // Original fairing dimensions.
+    glm::vec3 fairingScale(1.22f, 1.55f, 1.22f);
+
+    // Move the two halves in opposite directions.
+    float separationDistance = 1.5f * fairingSmooth;
+
+    glm::vec3 fairingOffsetA(
+        -separationDistance, 0.0f, 0.0f);
+
+    glm::vec3 fairingOffsetB(
+        separationDistance, 0.0f, 0.0f);
+
+    // Draw the first half.
+    drawRotatedCylinder(
+        fairingHalfA,
+        program,
+        view,
+        projection,
+        fairingPosition + fairingOffsetA,
+        fairingScale,
+        glm::vec3(0.0f, 1.0f, 0.0f),
+        0.0f,
+        white);
+
+    // Draw the second half, rotated 180 degrees.
+    drawRotatedCylinder(
+        fairingHalfB,
+        program,
+        view,
+        projection,
+        fairingPosition + fairingOffsetB,
+        fairingScale,
+        glm::vec3(0.0f, 1.0f, 0.0f),
+        180.0f,
+        white);
+
 
     // Two small orange bands to make stage boundaries visible.
     drawCylinder(cylinder, program, view, projection,
@@ -204,110 +316,165 @@ void drawRocket(Cylinder& cylinder, Cylinder& cone, Cube& cube, GLuint program,
                  glm::vec3(0.0f, 5.35f, 0.0f),
                  glm::vec3(1.13f, 0.10f, 1.13f), orange);
 
-    // Four simplified solid strap-on boosters around first stage.
+    // ================= BOOSTER SEPARATION =================
+
+    // Calculate how far the animation has progressed.
+    // Separation takes 2 seconds.
+    float separationProgress = 0.0f;
+
+    if (boosterSeparationStarted)
+    {
+        double elapsed =
+            glfwGetTime() - boosterSeparationStartTime;
+
+        separationProgress =
+            glm::clamp(static_cast<float>(elapsed / 2.0), 0.0f, 1.0f);
+    }
+
+    // Smooth the animation so it starts and ends gently.
+    float t = separationProgress;
+
+    float smoothProgress =
+        t * t * (3.0f - 2.0f * t);
+
+    // Four strap-on boosters.
     for (int i = 0; i < 4; ++i)
     {
         float a = glm::radians(45.0f + 90.0f * i);
-        glm::vec3 p(0.92f * cos(a), 1.85f, 0.92f * sin(a));
-        drawCylinder(cylinder, program, view, projection,
-                     p, glm::vec3(0.38f, 3.1f, 0.38f), white);
 
-        // Booster nose tips, narrow cones.
-        glm::vec3 tipPos = p + glm::vec3(0.0f, 1.65f, 0.0f);
-        drawCylinder(cone, program, view, projection,
-                     tipPos, glm::vec3(0.38f, 0.48f, 0.38f), orange);
+        // Original booster position.
+        glm::vec3 originalPosition(
+            0.92f * cos(a),
+            1.85f,
+            0.92f * sin(a));
+
+        // Direction away from the rocket.
+        glm::vec3 outwardDirection(
+            cos(a),
+            0.0f,
+            sin(a));
+
+        // Move each booster outward and slightly downward.
+        glm::vec3 separationOffset =
+            outwardDirection * (2.2f * smoothProgress) + glm::vec3(0.0f, -0.4f * smoothProgress, 0.0f);
+
+        glm::vec3 p = originalPosition + separationOffset;
+
+        // Draw the booster body.
+        drawCylinder(
+            cylinder, program, view, projection,
+            p,
+            glm::vec3(0.38f, 3.1f, 0.38f),
+            white);
+
+        // Draw the booster nose tip.
+        glm::vec3 tipPos =
+            p + glm::vec3(0.0f, 1.65f, 0.0f);
+
+        drawCylinder(
+            cone, program, view, projection,
+            tipPos,
+            glm::vec3(0.38f, 0.48f, 0.38f),
+            orange);
     }
+
+    // Four simplified solid strap-on boosters around first stage.
+    // for (int i = 0; i < 4; ++i)
+    // {
+    //     float a = glm::radians(45.0f + 90.0f * i);
+    //     glm::vec3 p(0.92f * cos(a), 1.85f, 0.92f * sin(a));
+    //     drawCylinder(cylinder, program, view, projection,
+    //                  p, glm::vec3(0.38f, 3.1f, 0.38f), white);
+
+    //     // Booster nose tips, narrow cones.
+    //     glm::vec3 tipPos = p + glm::vec3(0.0f, 1.65f, 0.0f);
+    //     drawCylinder(cone, program, view, projection,
+    //                  tipPos, glm::vec3(0.38f, 0.48f, 0.38f), orange);
+    // }
 
     // Mangalyaan orbiter shown beside the rocket so its components are visible.
     // Simplified box bus and two solar-panel wings.
     // ================= MANGLAYAAN SPACECRAFT =================
 
-        // Position of the spacecraft beside the rocket.
-        glm::vec3 spacecraftCenter(2.8f, 8.0f, 0.0f);
+    // Position of the spacecraft beside the rocket.
+    glm::vec3 spacecraftCenter(2.8f, 8.0f, 0.0f);
 
-        // 1. Main satellite body: gold thermal insulation.
+    // 1. Main satellite body: gold thermal insulation.
+    drawBox(
+        spacecraftCenter,
+        glm::vec3(0.85f, 0.65f, 0.65f),
+        glm::vec3(0.82f, 0.62f, 0.22f));
+
+    // 2. Dark mounting sections between body and solar panels.
+    for (int side : {-1, 1})
+    {
         drawBox(
-            spacecraftCenter,
-            glm::vec3(0.85f, 0.65f, 0.65f),
-            glm::vec3(0.82f, 0.62f, 0.22f)
-        );
+            spacecraftCenter + glm::vec3(0.0f, 0.0f, side * 0.55f),
+            glm::vec3(0.16f, 0.12f, 0.35f),
+            glm::vec3(0.35f, 0.35f, 0.38f));
+    }
 
-        // 2. Dark mounting sections between body and solar panels.
-        for (int side : {-1, 1})
+    // 3. Solar panels and their grid lines.
+    glm::vec3 panelColor(0.035f, 0.12f, 0.34f);
+    glm::vec3 gridColor(0.32f, 0.55f, 0.78f);
+
+    for (int side : {-1, 1})
+    {
+        // Centre of this solar panel.
+        glm::vec3 panelCenter =
+            spacecraftCenter + glm::vec3(0.0f, 0.0f, side * 1.45f);
+
+        // Main rectangular solar panel.
+        drawBox(
+            panelCenter,
+            glm::vec3(0.95f, 0.055f, 1.45f),
+            panelColor);
+
+        // Grid lines running along the length of the panel.
+        for (int i = -2; i <= 2; ++i)
         {
+            float x = i * 0.16f;
+
             drawBox(
-                spacecraftCenter + glm::vec3(0.0f, 0.0f, side * 0.55f),
-                glm::vec3(0.16f, 0.12f, 0.35f),
-                glm::vec3(0.35f, 0.35f, 0.38f)
-            );
+                panelCenter + glm::vec3(x, 0.032f, 0.0f),
+                glm::vec3(0.012f, 0.012f, 1.40f),
+                gridColor);
         }
 
-        // 3. Solar panels and their grid lines.
-        glm::vec3 panelColor(0.035f, 0.12f, 0.34f);
-        glm::vec3 gridColor(0.32f, 0.55f, 0.78f);
-
-        for (int side : {-1, 1})
+        // Cross-lines running across the panel.
+        for (int i = -3; i <= 3; ++i)
         {
-            // Centre of this solar panel.
-            glm::vec3 panelCenter =
-                spacecraftCenter + glm::vec3(0.0f, 0.0f, side * 1.45f);
+            float z = i * 0.19f;
 
-            // Main rectangular solar panel.
             drawBox(
-                panelCenter,
-                glm::vec3(0.95f, 0.055f, 1.45f),
-                panelColor
-            );
-
-            // Grid lines running along the length of the panel.
-            for (int i = -2; i <= 2; ++i)
-            {
-                float x = i * 0.16f;
-
-                drawBox(
-                    panelCenter + glm::vec3(x, 0.032f, 0.0f),
-                    glm::vec3(0.012f, 0.012f, 1.40f),
-                    gridColor
-                );
-            }
-
-            // Cross-lines running across the panel.
-            for (int i = -3; i <= 3; ++i)
-            {
-                float z = i * 0.19f;
-
-                drawBox(
-                    panelCenter + glm::vec3(0.0f, 0.033f, z),
-                    glm::vec3(0.92f, 0.012f, 0.012f),
-                    gridColor
-                );
-            }
+                panelCenter + glm::vec3(0.0f, 0.033f, z),
+                glm::vec3(0.92f, 0.012f, 0.012f),
+                gridColor);
         }
+    }
 
-// 4. Antenna mast above the spacecraft.
-drawCylinder(
-    cylinder,
-    program,
-    view,
-    projection,
-    spacecraftCenter + glm::vec3(0.0f, 0.48f, 0.0f),
-    glm::vec3(0.045f, 0.45f, 0.045f),
-    glm::vec3(0.75f, 0.75f, 0.72f)
-);
+    // 4. Antenna mast above the spacecraft.
+    drawCylinder(
+        cylinder,
+        program,
+        view,
+        projection,
+        spacecraftCenter + glm::vec3(0.0f, 0.48f, 0.0f),
+        glm::vec3(0.045f, 0.45f, 0.045f),
+        glm::vec3(0.75f, 0.75f, 0.72f));
 
-// 5. Small dish-like antenna element.
-drawCylinder(
-    cone,
-    program,
-    view,
-    projection,
-    spacecraftCenter + glm::vec3(0.0f, 0.73f, 0.0f),
-    glm::vec3(0.15f, 0.10f, 0.15f),
-    glm::vec3(0.78f, 0.78f, 0.74f)
-);
+    // 5. Small dish-like antenna element.
+    drawCylinder(
+        cone,
+        program,
+        view,
+        projection,
+        spacecraftCenter + glm::vec3(0.0f, 0.73f, 0.0f),
+        glm::vec3(0.15f, 0.10f, 0.15f),
+        glm::vec3(0.78f, 0.78f, 0.74f));
 }
 
-void processInput(GLFWwindow* window)
+void processInput(GLFWwindow *window)
 {
     const float angleStep = 1.2f;
     const float zoomStep = 0.25f;
@@ -315,8 +482,10 @@ void processInput(GLFWwindow* window)
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
-    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) cameraYaw -= angleStep;
-    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) cameraYaw += angleStep;
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+        cameraYaw -= angleStep;
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+        cameraYaw += angleStep;
     if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
         cameraPitch = glm::min(cameraPitch + angleStep, 80.0f);
     if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
@@ -326,6 +495,19 @@ void processInput(GLFWwindow* window)
         cameraDistance = glm::max(cameraDistance - zoomStep, 5.0f);
     if (glfwGetKey(window, GLFW_KEY_RIGHT_BRACKET) == GLFW_PRESS)
         cameraDistance = glm::min(cameraDistance + zoomStep, 45.0f);
+
+    // Start booster separation when B is pressed.
+    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS && !boosterSeparationStarted)
+    {
+        boosterSeparationStarted = true;
+        boosterSeparationStartTime = glfwGetTime();
+    }
+    // Start payload fairing separation.
+    if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS && !fairingSeparationStarted)
+    {
+        fairingSeparationStarted = true;
+        fairingSeparationStartTime = glfwGetTime();
+    }
 }
 
 int main()
@@ -340,7 +522,7 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* window = glfwCreateWindow(
+    GLFWwindow *window = glfwCreateWindow(
         WINDOW_WIDTH, WINDOW_HEIGHT, "a2-model-2 - PSLV-C25 and Mangalyaan",
         nullptr, nullptr);
 
@@ -377,10 +559,16 @@ int main()
         Cylinder cone(64, true);
         Cube cube;
 
+        // Two halves of the payload fairing.
+        Cylinder fairingHalfA(36, true, true);
+        Cylinder fairingHalfB(36, true, true);
+
         cout << "a2-model-2 controls:\n"
-             << "  Arrow keys: orbit camera\n"
-             << "  [ and ]: zoom in/out\n"
-             << "  Esc: exit\n";
+            << "  Arrow keys: orbit camera\n"
+            << "  [ and ]: zoom in/out\n"
+            << "  B: separate boosters\n"
+            << "  F: separate payload fairing\n"
+            << "  Esc: exit\n";
 
         while (!glfwWindowShouldClose(window))
         {
@@ -388,7 +576,8 @@ int main()
 
             int width = 0, height = 0;
             glfwGetFramebufferSize(window, &width, &height);
-            if (height == 0) height = 1;
+            if (height == 0)
+                height = 1;
             glViewport(0, 0, width, height);
 
             glClearColor(0.025f, 0.035f, 0.07f, 1.0f);
@@ -411,13 +600,22 @@ int main()
                 static_cast<float>(width) / static_cast<float>(height),
                 0.1f, 100.0f);
 
-            drawRocket(cylinder, cone, cube, program, view, projection);
+            // drawRocket(cylinder, cone, cube, program, view, projection);
+            drawRocket(
+                cylinder,
+                cone,
+                fairingHalfA,
+                fairingHalfB,
+                cube,
+                program,
+                view,
+                projection);
 
             glfwSwapBuffers(window);
             glfwPollEvents();
         }
     }
-    catch (const exception& e)
+    catch (const exception &e)
     {
         cerr << "Error: " << e.what() << '\n';
     }

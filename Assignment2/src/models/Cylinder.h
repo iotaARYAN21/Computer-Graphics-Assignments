@@ -11,7 +11,7 @@ private:
 public:
     // Cylinder is centred at origin, extends from y=-0.5 to y=+0.5.
     // radius is 0.5. Cone mode tapers the top radius to zero.
-    explicit Cylinder(int sectors = 48, bool cone = false);
+    explicit Cylinder(int sectors = 48, bool cone = false,bool halfCone = false);
     void draw();
     ~Cylinder();
 
