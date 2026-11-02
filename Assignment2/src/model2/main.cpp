@@ -1,3 +1,1287 @@
+// #include <GL/glew.h>
+// #include <GLFW/glfw3.h>
+
+// #include <glm/glm.hpp>
+// #include <glm/gtc/matrix_transform.hpp>
+// #include <glm/gtc/type_ptr.hpp>
+
+// #include "../models/Cylinder.h"
+// #include "../models/Cube.h"
+// #include "../models/Fairing.h"
+
+// #include <algorithm>
+// #include <cmath>
+// #include <exception>
+// #include <fstream>
+// #include <iostream>
+// #include <sstream>
+// #include <stdexcept>
+// #include <string>
+
+// using namespace std;
+
+// const int WINDOW_WIDTH = 1000;
+// const int WINDOW_HEIGHT = 800;
+
+// float cameraYaw = 35.0f;
+// float cameraPitch = 18.0f;
+// float cameraDistance = 18.0f;
+
+// // Booster separation animation.
+// bool boosterSeparationStarted = false;
+// double boosterSeparationStartTime = 0.0;
+// // Payload fairing separation.
+// bool fairingSeparationStarted = false;
+// double fairingSeparationStartTime = 0.0;
+
+// string readFile(const string &path)
+// {
+//     ifstream file(path);
+//     if (!file)
+//         throw runtime_error("Cannot open shader file: " + path);
+
+//     stringstream buffer;
+//     buffer << file.rdbuf();
+//     return buffer.str();
+// }
+
+// GLuint compileShader(GLenum type, const string &source)
+// {
+//     GLuint shader = glCreateShader(type);
+//     const char *src = source.c_str();
+//     glShaderSource(shader, 1, &src, nullptr);
+//     glCompileShader(shader);
+
+//     GLint success = GL_FALSE;
+//     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+//     if (!success)
+//     {
+//         char log[1024];
+//         glGetShaderInfoLog(shader, sizeof(log), nullptr, log);
+//         cerr << "Shader compilation error:\n"
+//              << log << '\n';
+//         glDeleteShader(shader);
+//         throw runtime_error("Shader compilation failed");
+//     }
+//     return shader;
+// }
+
+// GLuint createProgram(const string &vertexPath, const string &fragmentPath)
+// {
+//     GLuint vs = compileShader(GL_VERTEX_SHADER, readFile(vertexPath));
+//     GLuint fs = compileShader(GL_FRAGMENT_SHADER, readFile(fragmentPath));
+
+//     GLuint program = glCreateProgram();
+//     glAttachShader(program, vs);
+//     glAttachShader(program, fs);
+//     glLinkProgram(program);
+
+//     GLint success = GL_FALSE;
+//     glGetProgramiv(program, GL_LINK_STATUS, &success);
+
+//     glDeleteShader(vs);
+//     glDeleteShader(fs);
+
+//     if (!success)
+//     {
+//         char log[1024];
+//         glGetProgramInfoLog(program, sizeof(log), nullptr, log);
+//         cerr << "Shader link error:\n"
+//              << log << '\n';
+//         glDeleteProgram(program);
+//         throw runtime_error("Shader linking failed");
+//     }
+//     return program;
+// }
+
+// void setMatrices(GLuint program, const glm::mat4 &model,
+//                  const glm::mat4 &view, const glm::mat4 &projection)
+// {
+//     glUseProgram(program);
+//     glUniformMatrix4fv(glGetUniformLocation(program, "model"),
+//                        1, GL_FALSE, glm::value_ptr(model));
+//     glUniformMatrix4fv(glGetUniformLocation(program, "view"),
+//                        1, GL_FALSE, glm::value_ptr(view));
+//     glUniformMatrix4fv(glGetUniformLocation(program, "projection"),
+//                        1, GL_FALSE, glm::value_ptr(projection));
+// }
+
+// void drawCylinder(Cylinder &cylinder, GLuint program,
+//                   const glm::mat4 &view, const glm::mat4 &projection,
+//                   const glm::vec3 &position, const glm::vec3 &scale,
+//                   const glm::vec3 &color)
+// {
+//     glm::mat4 model(1.0f);
+//     model = glm::translate(model, position);
+//     model = glm::scale(model, scale);
+
+//     setMatrices(program, model, view, projection);
+//     glUniform3f(glGetUniformLocation(program, "lightPos"), 5.0f, 8.0f, 6.0f);
+//     glUniform3fv(glGetUniformLocation(program, "objectColor"), 1,
+//                  glm::value_ptr(color));
+//     cylinder.draw();
+// }
+
+// void drawRotatedCylinder(
+//     Cylinder &cylinder,
+//     GLuint program,
+//     const glm::mat4 &view,
+//     const glm::mat4 &projection,
+//     const glm::vec3 &position,
+//     const glm::vec3 &scale,
+//     const glm::vec3 &rotationAxis,
+//     float rotationAngle,
+//     const glm::vec3 &color)
+// {
+//     glm::mat4 model(1.0f);
+
+//     model = glm::translate(model, position);
+
+//     model = glm::rotate(
+//         model,
+//         glm::radians(rotationAngle),
+//         rotationAxis);
+
+//     model = glm::scale(model, scale);
+
+//     setMatrices(program, model, view, projection);
+
+//     glUniform3f(
+//         glGetUniformLocation(program, "lightPos"),
+//         5.0f, 8.0f, 6.0f);
+
+//     glUniform3fv(
+//         glGetUniformLocation(program, "objectColor"),
+//         1,
+//         glm::value_ptr(color));
+
+//     cylinder.draw();
+// }
+
+// void drawRocket(Cylinder &cylinder,
+//                 Cylinder &cone,
+//                 Fairing &fairingHalfA,
+//                 Fairing &fairingHalfB,
+//                 Cube &cube,
+//                 GLuint program,
+//                 const glm::mat4 &view,
+//                 const glm::mat4 &projection)
+// {
+//     // PSLV-C25 inspired proportions. Model units are illustrative, not exact scale.
+//     // Base is y=0; vehicle is stacked vertically along +Y.
+
+//     const glm::vec3 white(0.88f, 0.88f, 0.84f);
+//     const glm::vec3 orange(0.90f, 0.30f, 0.08f);
+//     const glm::vec3 dark(0.22f, 0.24f, 0.28f);
+//     const glm::vec3 black(0.08f, 0.09f, 0.11f);
+//     const glm::vec3 gold(0.82f, 0.63f, 0.18f);
+
+//     // Helper to draw a coloured cube at any position and size.
+//     auto drawBox = [&](const glm::vec3 &position,
+//                        const glm::vec3 &size,
+//                        const glm::vec3 &color)
+//     {
+//         glm::mat4 model(1.0f);
+
+//         // Move the cube to its position.
+//         model = glm::translate(model, position);
+
+//         // Resize the cube.
+//         model = glm::scale(model, size);
+
+//         // Set transformation matrices.
+//         setMatrices(program, model, view, projection);
+
+//         // Set lighting and colour.
+//         glUniform3f(
+//             glGetUniformLocation(program, "lightPos"),
+//             5.0f, 8.0f, 6.0f);
+
+//         glUniform3fv(
+//             glGetUniformLocation(program, "objectColor"),
+//             1,
+//             glm::value_ptr(color));
+
+//         // Draw the cube.
+//         cube.draw();
+//     };
+
+//     // First stage: largest lower cylinder.
+//     drawCylinder(cylinder, program, view, projection,
+//                  glm::vec3(0.0f, 1.75f, 0.0f),
+//                  glm::vec3(1.45f, 3.5f, 1.45f), white);
+
+//     // Interstage ring above first stage.
+//     drawCylinder(cylinder, program, view, projection,
+//                  glm::vec3(0.0f, 3.58f, 0.0f),
+//                  glm::vec3(1.48f, 0.18f, 1.48f), dark);
+
+//     // Second stage.
+//     drawCylinder(cylinder, program, view, projection,
+//                  glm::vec3(0.0f, 4.65f, 0.0f),
+//                  glm::vec3(1.12f, 2.0f, 1.12f), orange);
+
+//     // Interstage ring.
+//     drawCylinder(cylinder, program, view, projection,
+//                  glm::vec3(0.0f, 5.72f, 0.0f),
+//                  glm::vec3(1.16f, 0.16f, 1.16f), dark);
+
+//     // Third stage.
+//     drawCylinder(cylinder, program, view, projection,
+//                  glm::vec3(0.0f, 6.65f, 0.0f),
+//                  glm::vec3(0.88f, 1.75f, 0.88f), white);
+
+//     // Fourth stage (PS4).
+//     drawCylinder(cylinder, program, view, projection,
+//                  glm::vec3(0.0f, 7.78f, 0.0f),
+//                  glm::vec3(0.72f, 0.55f, 0.72f), dark);
+
+//     // Payload adapter.
+//     drawCylinder(cylinder, program, view, projection,
+//                  glm::vec3(0.0f, 8.18f, 0.0f),
+//                  glm::vec3(0.62f, 0.28f, 0.62f), gold);
+
+//     // Payload fairing: simple pointed cone above the fourth stage.
+//     // drawCylinder(cone, program, view, projection,
+//     //              glm::vec3(0.0f, 9.05f, 0.0f),
+//     //              glm::vec3(1.22f, 1.55f, 1.22f), white);
+
+//     // ================= PAYLOAD FAIRING SEPARATION =================
+
+//     // Calculate animation progress.
+//     float fairingProgress = 0.0f;
+
+//     if (fairingSeparationStarted)
+//     {
+//         double elapsed =
+//             glfwGetTime() - fairingSeparationStartTime;
+
+//         fairingProgress = glm::clamp(
+//             static_cast<float>(elapsed / 2.0),
+//             0.0f,
+//             1.0f);
+//     }
+
+//     // Smooth movement.
+//     float fairingSmooth =
+//         fairingProgress * fairingProgress *
+//         (3.0f - 2.0f * fairingProgress);
+
+//     // Original fairing position.
+//     glm::vec3 fairingPosition(0.0f, 9.05f, 0.0f);
+
+//     // Original fairing scale.
+//     glm::vec3 fairingScale(1.22f, 1.55f, 1.22f);
+
+//     // Move the halves in opposite directions.
+//     float separationDistance = 1.0f * fairingSmooth;
+
+//     glm::vec3 fairingOffsetA(
+//         -separationDistance, 0.0f, 0.0f);
+
+//     glm::vec3 fairingOffsetB(
+//         separationDistance, 0.0f, 0.0f);
+
+//     // Draw the first fairing half.
+//         // Draw the first fairing half.
+//     glm::mat4 modelA(1.0f);
+
+//     // Move it away from the rocket.
+//     modelA = glm::translate(
+//         modelA,
+//         fairingPosition + fairingOffsetA
+//     );
+
+//     // Rotate it outward around the Y-axis.
+//     float rotationA = glm::radians(-35.0f * fairingSmooth);
+
+//     modelA = glm::translate(
+//         modelA,
+//         glm::vec3(0.0f, 0.0f, 0.0f)
+//     );
+
+    
+
+//     // Apply the original scale.
+//     modelA = glm::scale(modelA, fairingScale);
+
+//     setMatrices(program, modelA, view, projection);
+
+//     glUniform3f(
+//         glGetUniformLocation(program, "lightPos"),
+//         5.0f, 8.0f, 6.0f
+//     );
+
+//     glUniform3f(
+//         glGetUniformLocation(program, "objectColor"),
+//         0.88f, 0.88f, 0.84f
+//     );
+
+//     fairingHalfA.draw();
+
+//     // Draw the second fairing half.
+//         // Draw the second fairing half.
+//     glm::mat4 modelB(1.0f);
+
+//     // Move it away from the rocket.
+//     modelB = glm::translate(
+//         modelB,
+//         fairingPosition + fairingOffsetB
+//     );
+
+//     // Rotate it outward in the opposite direction.
+//     float rotationB = glm::radians(35.0f * fairingSmooth);
+
+    
+
+//     // Apply the original scale.
+//     modelB = glm::scale(modelB, fairingScale);
+
+//     setMatrices(program, modelB, view, projection);
+
+//     glUniform3f(
+//         glGetUniformLocation(program, "lightPos"),
+//         5.0f, 8.0f, 6.0f
+//     );
+
+//     glUniform3f(
+//         glGetUniformLocation(program, "objectColor"),
+//         0.88f, 0.88f, 0.84f
+//     );
+
+//     fairingHalfB.draw();
+
+
+//     // Two small orange bands to make stage boundaries visible.
+//     drawCylinder(cylinder, program, view, projection,
+//                  glm::vec3(0.0f, 0.95f, 0.0f),
+//                  glm::vec3(1.46f, 0.12f, 1.46f), orange);
+//     drawCylinder(cylinder, program, view, projection,
+//                  glm::vec3(0.0f, 5.35f, 0.0f),
+//                  glm::vec3(1.13f, 0.10f, 1.13f), orange);
+
+//     // ================= BOOSTER SEPARATION =================
+
+//     // Calculate how far the animation has progressed.
+//     // Separation takes 2 seconds.
+//     float separationProgress = 0.0f;
+
+//     if (boosterSeparationStarted)
+//     {
+//         double elapsed =
+//             glfwGetTime() - boosterSeparationStartTime;
+
+//         separationProgress =
+//             glm::clamp(static_cast<float>(elapsed / 2.0), 0.0f, 1.0f);
+//     }
+
+//     // Smooth the animation so it starts and ends gently.
+//     float t = separationProgress;
+
+//     float smoothProgress =
+//         t * t * (3.0f - 2.0f * t);
+
+//     // Four strap-on boosters.
+//     for (int i = 0; i < 4; ++i)
+//     {
+//         float a = glm::radians(45.0f + 90.0f * i);
+
+//         // Original booster position.
+//         glm::vec3 originalPosition(
+//             0.92f * cos(a),
+//             1.85f,
+//             0.92f * sin(a));
+
+//         // Direction away from the rocket.
+//         glm::vec3 outwardDirection(
+//             cos(a),
+//             0.0f,
+//             sin(a));
+
+//         // Move each booster outward and slightly downward.
+//         glm::vec3 separationOffset =
+//             outwardDirection * (2.2f * smoothProgress) + glm::vec3(0.0f, -0.4f * smoothProgress, 0.0f);
+
+//         glm::vec3 p = originalPosition + separationOffset;
+
+//         // Draw the booster body.
+//         drawCylinder(
+//             cylinder, program, view, projection,
+//             p,
+//             glm::vec3(0.38f, 3.1f, 0.38f),
+//             white);
+
+//         // Draw the booster nose tip.
+//         glm::vec3 tipPos =
+//             p + glm::vec3(0.0f, 1.65f, 0.0f);
+
+//         drawCylinder(
+//             cone, program, view, projection,
+//             tipPos,
+//             glm::vec3(0.38f, 0.48f, 0.38f),
+//             orange);
+//     }
+
+//     // Four simplified solid strap-on boosters around first stage.
+//     // for (int i = 0; i < 4; ++i)
+//     // {
+//     //     float a = glm::radians(45.0f + 90.0f * i);
+//     //     glm::vec3 p(0.92f * cos(a), 1.85f, 0.92f * sin(a));
+//     //     drawCylinder(cylinder, program, view, projection,
+//     //                  p, glm::vec3(0.38f, 3.1f, 0.38f), white);
+
+//     //     // Booster nose tips, narrow cones.
+//     //     glm::vec3 tipPos = p + glm::vec3(0.0f, 1.65f, 0.0f);
+//     //     drawCylinder(cone, program, view, projection,
+//     //                  tipPos, glm::vec3(0.38f, 0.48f, 0.38f), orange);
+//     // }
+
+//     // Mangalyaan orbiter shown beside the rocket so its components are visible.
+//     // Simplified box bus and two solar-panel wings.
+//     // ================= MANGLAYAAN SPACECRAFT =================
+
+//     // Position of the spacecraft beside the rocket.
+//     glm::vec3 spacecraftCenter(2.8f, 8.0f, 0.0f);
+
+//     // 1. Main satellite body: gold thermal insulation.
+//     drawBox(
+//         spacecraftCenter,
+//         glm::vec3(0.85f, 0.65f, 0.65f),
+//         glm::vec3(0.82f, 0.62f, 0.22f));
+
+//     // 2. Dark mounting sections between body and solar panels.
+//     for (int side : {-1, 1})
+//     {
+//         drawBox(
+//             spacecraftCenter + glm::vec3(0.0f, 0.0f, side * 0.55f),
+//             glm::vec3(0.16f, 0.12f, 0.35f),
+//             glm::vec3(0.35f, 0.35f, 0.38f));
+//     }
+
+//     // 3. Solar panels and their grid lines.
+//     glm::vec3 panelColor(0.035f, 0.12f, 0.34f);
+//     glm::vec3 gridColor(0.32f, 0.55f, 0.78f);
+
+//     for (int side : {-1, 1})
+//     {
+//         // Centre of this solar panel.
+//         glm::vec3 panelCenter =
+//             spacecraftCenter + glm::vec3(0.0f, 0.0f, side * 1.45f);
+
+//         // Main rectangular solar panel.
+//         drawBox(
+//             panelCenter,
+//             glm::vec3(0.95f, 0.055f, 1.45f),
+//             panelColor);
+
+//         // Grid lines running along the length of the panel.
+//         for (int i = -2; i <= 2; ++i)
+//         {
+//             float x = i * 0.16f;
+
+//             drawBox(
+//                 panelCenter + glm::vec3(x, 0.032f, 0.0f),
+//                 glm::vec3(0.012f, 0.012f, 1.40f),
+//                 gridColor);
+//         }
+
+//         // Cross-lines running across the panel.
+//         for (int i = -3; i <= 3; ++i)
+//         {
+//             float z = i * 0.19f;
+
+//             drawBox(
+//                 panelCenter + glm::vec3(0.0f, 0.033f, z),
+//                 glm::vec3(0.92f, 0.012f, 0.012f),
+//                 gridColor);
+//         }
+//     }
+
+//     // 4. Antenna mast above the spacecraft.
+//     drawCylinder(
+//         cylinder,
+//         program,
+//         view,
+//         projection,
+//         spacecraftCenter + glm::vec3(0.0f, 0.48f, 0.0f),
+//         glm::vec3(0.045f, 0.45f, 0.045f),
+//         glm::vec3(0.75f, 0.75f, 0.72f));
+
+//     // 5. Small dish-like antenna element.
+//     drawCylinder(
+//         cone,
+//         program,
+//         view,
+//         projection,
+//         spacecraftCenter + glm::vec3(0.0f, 0.73f, 0.0f),
+//         glm::vec3(0.15f, 0.10f, 0.15f),
+//         glm::vec3(0.78f, 0.78f, 0.74f));
+// }
+
+// void processInput(GLFWwindow *window)
+// {
+//     const float angleStep = 1.2f;
+//     const float zoomStep = 0.25f;
+
+//     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+//         glfwSetWindowShouldClose(window, true);
+
+//     if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+//         cameraYaw -= angleStep;
+//     if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+//         cameraYaw += angleStep;
+//     if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+//         cameraPitch = glm::min(cameraPitch + angleStep, 80.0f);
+//     if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+//         cameraPitch = glm::max(cameraPitch - angleStep, -10.0f);
+
+//     if (glfwGetKey(window, GLFW_KEY_LEFT_BRACKET) == GLFW_PRESS)
+//         cameraDistance = glm::max(cameraDistance - zoomStep, 5.0f);
+//     if (glfwGetKey(window, GLFW_KEY_RIGHT_BRACKET) == GLFW_PRESS)
+//         cameraDistance = glm::min(cameraDistance + zoomStep, 45.0f);
+
+//     // Start booster separation when B is pressed.
+//     if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS && !boosterSeparationStarted)
+//     {
+//         boosterSeparationStarted = true;
+//         boosterSeparationStartTime = glfwGetTime();
+//     }
+//     // Start payload fairing separation.
+//     if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS && !fairingSeparationStarted)
+//     {
+//         fairingSeparationStarted = true;
+//         fairingSeparationStartTime = glfwGetTime();
+//     }
+// }
+
+// int main()
+// {
+//     if (!glfwInit())
+//     {
+//         cerr << "Failed to initialize GLFW\n";
+//         return -1;
+//     }
+
+//     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+//     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+//     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+//     GLFWwindow *window = glfwCreateWindow(
+//         WINDOW_WIDTH, WINDOW_HEIGHT, "a2-model-2 - PSLV-C25 and Mangalyaan",
+//         nullptr, nullptr);
+
+//     if (!window)
+//     {
+//         cerr << "Failed to create GLFW window\n";
+//         glfwTerminate();
+//         return -1;
+//     }
+
+//     glfwMakeContextCurrent(window);
+//     glfwSwapInterval(1);
+//     glewExperimental = GL_TRUE;
+
+//     if (glewInit() != GLEW_OK)
+//     {
+//         cerr << "Failed to initialize GLEW\n";
+//         glfwDestroyWindow(window);
+//         glfwTerminate();
+//         return -1;
+//     }
+//     glGetError();
+
+//     glEnable(GL_DEPTH_TEST);
+
+//     GLuint program = 0;
+//     try
+//     {
+//         program = createProgram(
+//             "shaders/rocket_vertex.glsl",
+//             "shaders/rocket_fragment.glsl");
+
+//         Cylinder cylinder(64, false);
+//         Cylinder cone(64, true);
+//         Cube cube;
+
+//         // Two halves of the payload fairing.
+//         Fairing fairingHalfA(0, 36);
+//         Fairing fairingHalfB(1, 36);
+
+//         cout << "a2-model-2 controls:\n"
+//             << "  Arrow keys: orbit camera\n"
+//             << "  [ and ]: zoom in/out\n"
+//             << "  B: separate boosters\n"
+//             << "  F: separate payload fairing\n"
+//             << "  Esc: exit\n";
+
+//         while (!glfwWindowShouldClose(window))
+//         {
+//             processInput(window);
+
+//             int width = 0, height = 0;
+//             glfwGetFramebufferSize(window, &width, &height);
+//             if (height == 0)
+//                 height = 1;
+//             glViewport(0, 0, width, height);
+
+//             glClearColor(0.025f, 0.035f, 0.07f, 1.0f);
+//             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+//             float yaw = glm::radians(cameraYaw);
+//             float pitch = glm::radians(cameraPitch);
+
+//             glm::vec3 target(0.8f, 4.7f, 0.0f);
+//             glm::vec3 cameraPosition(
+//                 target.x + cameraDistance * cos(pitch) * sin(yaw),
+//                 target.y + cameraDistance * sin(pitch),
+//                 target.z + cameraDistance * cos(pitch) * cos(yaw));
+
+//             glm::mat4 view = glm::lookAt(
+//                 cameraPosition, target, glm::vec3(0.0f, 1.0f, 0.0f));
+
+//             glm::mat4 projection = glm::perspective(
+//                 glm::radians(45.0f),
+//                 static_cast<float>(width) / static_cast<float>(height),
+//                 0.1f, 100.0f);
+
+//             // drawRocket(cylinder, cone, cube, program, view, projection);
+//             drawRocket(
+//                 cylinder,
+//                 cone,
+//                 fairingHalfA,
+//                 fairingHalfB,
+//                 cube,
+//                 program,
+//                 view,
+//                 projection);
+
+//             glfwSwapBuffers(window);
+//             glfwPollEvents();
+//         }
+//     }
+//     catch (const exception &e)
+//     {
+//         cerr << "Error: " << e.what() << '\n';
+//     }
+
+//     if (program)
+//         glDeleteProgram(program);
+
+//     glfwDestroyWindow(window);
+//     glfwTerminate();
+//     return 0;
+// }
+
+
+
+
+
+// #include <GL/glew.h>
+// #include <GLFW/glfw3.h>
+
+// #include <glm/glm.hpp>
+// #include <glm/gtc/matrix_transform.hpp>
+// #include <glm/gtc/type_ptr.hpp>
+
+// #include "../models/Cylinder.h"
+// #include "../models/Cube.h"
+// #include "../models/Fairing.h"
+
+// #include <algorithm>
+// #include <cmath>
+// #include <exception>
+// #include <fstream>
+// #include <iostream>
+// #include <sstream>
+// #include <stdexcept>
+// #include <string>
+
+// using namespace std;
+
+// const int WINDOW_WIDTH = 1000;
+// const int WINDOW_HEIGHT = 800;
+
+// float cameraYaw = 35.0f;
+// float cameraPitch = 18.0f;
+// float cameraDistance = 18.0f;
+
+// // Booster separation animation.
+// bool boosterSeparationStarted = false;
+// double boosterSeparationStartTime = 0.0;
+// // Payload fairing separation.
+// bool fairingSeparationStarted = false;
+// double fairingSeparationStartTime = 0.0;
+
+// string readFile(const string &path)
+// {
+//     ifstream file(path);
+//     if (!file)
+//         throw runtime_error("Cannot open shader file: " + path);
+
+//     stringstream buffer;
+//     buffer << file.rdbuf();
+//     return buffer.str();
+// }
+
+// GLuint compileShader(GLenum type, const string &source)
+// {
+//     GLuint shader = glCreateShader(type);
+//     const char *src = source.c_str();
+//     glShaderSource(shader, 1, &src, nullptr);
+//     glCompileShader(shader);
+
+//     GLint success = GL_FALSE;
+//     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+//     if (!success)
+//     {
+//         char log[1024];
+//         glGetShaderInfoLog(shader, sizeof(log), nullptr, log);
+//         cerr << "Shader compilation error:\n"
+//              << log << '\n';
+//         glDeleteShader(shader);
+//         throw runtime_error("Shader compilation failed");
+//     }
+//     return shader;
+// }
+
+// GLuint createProgram(const string &vertexPath, const string &fragmentPath)
+// {
+//     GLuint vs = compileShader(GL_VERTEX_SHADER, readFile(vertexPath));
+//     GLuint fs = compileShader(GL_FRAGMENT_SHADER, readFile(fragmentPath));
+
+//     GLuint program = glCreateProgram();
+//     glAttachShader(program, vs);
+//     glAttachShader(program, fs);
+//     glLinkProgram(program);
+
+//     GLint success = GL_FALSE;
+//     glGetProgramiv(program, GL_LINK_STATUS, &success);
+
+//     glDeleteShader(vs);
+//     glDeleteShader(fs);
+
+//     if (!success)
+//     {
+//         char log[1024];
+//         glGetProgramInfoLog(program, sizeof(log), nullptr, log);
+//         cerr << "Shader link error:\n"
+//              << log << '\n';
+//         glDeleteProgram(program);
+//         throw runtime_error("Shader linking failed");
+//     }
+//     return program;
+// }
+
+// void setMatrices(GLuint program, const glm::mat4 &model,
+//                  const glm::mat4 &view, const glm::mat4 &projection)
+// {
+//     glUseProgram(program);
+//     glUniformMatrix4fv(glGetUniformLocation(program, "model"),
+//                        1, GL_FALSE, glm::value_ptr(model));
+//     glUniformMatrix4fv(glGetUniformLocation(program, "view"),
+//                        1, GL_FALSE, glm::value_ptr(view));
+//     glUniformMatrix4fv(glGetUniformLocation(program, "projection"),
+//                        1, GL_FALSE, glm::value_ptr(projection));
+// }
+
+// void drawCylinder(Cylinder &cylinder, GLuint program,
+//                   const glm::mat4 &view, const glm::mat4 &projection,
+//                   const glm::vec3 &position, const glm::vec3 &scale,
+//                   const glm::vec3 &color)
+// {
+//     glm::mat4 model(1.0f);
+//     model = glm::translate(model, position);
+//     model = glm::scale(model, scale);
+
+//     setMatrices(program, model, view, projection);
+//     glUniform3f(glGetUniformLocation(program, "lightPos"), 5.0f, 8.0f, 6.0f);
+//     glUniform3fv(glGetUniformLocation(program, "objectColor"), 1,
+//                  glm::value_ptr(color));
+//     cylinder.draw();
+// }
+
+// void drawRotatedCylinder(
+//     Cylinder &cylinder,
+//     GLuint program,
+//     const glm::mat4 &view,
+//     const glm::mat4 &projection,
+//     const glm::vec3 &position,
+//     const glm::vec3 &scale,
+//     const glm::vec3 &rotationAxis,
+//     float rotationAngle,
+//     const glm::vec3 &color)
+// {
+//     glm::mat4 model(1.0f);
+
+//     model = glm::translate(model, position);
+
+//     model = glm::rotate(
+//         model,
+//         glm::radians(rotationAngle),
+//         rotationAxis);
+
+//     model = glm::scale(model, scale);
+
+//     setMatrices(program, model, view, projection);
+
+//     glUniform3f(
+//         glGetUniformLocation(program, "lightPos"),
+//         5.0f, 8.0f, 6.0f);
+
+//     glUniform3fv(
+//         glGetUniformLocation(program, "objectColor"),
+//         1,
+//         glm::value_ptr(color));
+
+//     cylinder.draw();
+// }
+
+// void drawRocket(Cylinder &cylinder,
+//                 Cylinder &cone,
+//                 Fairing &fairingHalfA,
+//                 Fairing &fairingHalfB,
+//                 Cube &cube,
+//                 GLuint program,
+//                 const glm::mat4 &view,
+//                 const glm::mat4 &projection)
+// {
+//     // PSLV-C25 inspired proportions. Model units are illustrative, not exact scale.
+//     // Base is y=0; vehicle is stacked vertically along +Y.
+
+//     const glm::vec3 white(0.88f, 0.88f, 0.84f);
+//     const glm::vec3 orange(0.90f, 0.30f, 0.08f);
+//     const glm::vec3 dark(0.22f, 0.24f, 0.28f);
+//     const glm::vec3 black(0.08f, 0.09f, 0.11f);
+//     const glm::vec3 gold(0.82f, 0.63f, 0.18f);
+
+//     // Helper to draw a coloured cube at any position and size.
+//     auto drawBox = [&](const glm::vec3 &position,
+//                        const glm::vec3 &size,
+//                        const glm::vec3 &color)
+//     {
+//         glm::mat4 model(1.0f);
+
+//         // Move the cube to its position.
+//         model = glm::translate(model, position);
+
+//         // Resize the cube.
+//         model = glm::scale(model, size);
+
+//         // Set transformation matrices.
+//         setMatrices(program, model, view, projection);
+
+//         // Set lighting and colour.
+//         glUniform3f(
+//             glGetUniformLocation(program, "lightPos"),
+//             5.0f, 8.0f, 6.0f);
+
+//         glUniform3fv(
+//             glGetUniformLocation(program, "objectColor"),
+//             1,
+//             glm::value_ptr(color));
+
+//         // Draw the cube.
+//         cube.draw();
+//     };
+
+//     // First stage: largest lower cylinder.
+//     drawCylinder(cylinder, program, view, projection,
+//                  glm::vec3(0.0f, 1.75f, 0.0f),
+//                  glm::vec3(1.45f, 3.5f, 1.45f), white);
+
+//     // Interstage ring above first stage.
+//     drawCylinder(cylinder, program, view, projection,
+//                  glm::vec3(0.0f, 3.58f, 0.0f),
+//                  glm::vec3(1.48f, 0.18f, 1.48f), dark);
+
+//     // Second stage.
+//     drawCylinder(cylinder, program, view, projection,
+//                  glm::vec3(0.0f, 4.65f, 0.0f),
+//                  glm::vec3(1.12f, 2.0f, 1.12f), orange);
+
+//     // Interstage ring.
+//     drawCylinder(cylinder, program, view, projection,
+//                  glm::vec3(0.0f, 5.72f, 0.0f),
+//                  glm::vec3(1.16f, 0.16f, 1.16f), dark);
+
+//     // Third stage.
+//     drawCylinder(cylinder, program, view, projection,
+//                  glm::vec3(0.0f, 6.65f, 0.0f),
+//                  glm::vec3(0.88f, 1.75f, 0.88f), white);
+
+//     // Fourth stage (PS4).
+//     drawCylinder(cylinder, program, view, projection,
+//                  glm::vec3(0.0f, 7.78f, 0.0f),
+//                  glm::vec3(0.72f, 0.55f, 0.72f), dark);
+
+//     // Payload adapter.
+//     drawCylinder(cylinder, program, view, projection,
+//                  glm::vec3(0.0f, 8.18f, 0.0f),
+//                  glm::vec3(0.62f, 0.28f, 0.62f), gold);
+
+//     // Payload fairing: simple pointed cone above the fourth stage.
+//     // drawCylinder(cone, program, view, projection,
+//     //              glm::vec3(0.0f, 9.05f, 0.0f),
+//     //              glm::vec3(1.22f, 1.55f, 1.22f), white);
+
+//     // ================= PAYLOAD FAIRING SEPARATION =================
+
+//     // The fairing separates over two seconds.
+//     float fairingProgress = 0.0f;
+//     if (fairingSeparationStarted)
+//     {
+//         const double elapsed = glfwGetTime() - fairingSeparationStartTime;
+//         fairingProgress = glm::clamp(
+//             static_cast<float>(elapsed / 2.0), 0.0f, 1.0f);
+//     }
+
+//     // Smoothstep: avoids abrupt movement at the beginning and end.
+//     const float fairingSmooth =
+//         fairingProgress * fairingProgress * (3.0f - 2.0f * fairingProgress);
+
+//     const glm::vec3 fairingPosition(0.0f, 9.05f, 0.0f);
+//     const glm::vec3 fairingScale(1.22f, 1.55f, 1.22f);
+
+//     // Fairing.cpp creates the two halves as front/back semicircles in the
+//     // XZ plane, so they must separate along Z (not X).
+//     const float separationDistance = 1.25f * fairingSmooth;
+//     const glm::vec3 fairingOffsetA(0.0f, 0.0f, separationDistance);
+//     const glm::vec3 fairingOffsetB(0.0f, 0.0f, -separationDistance);
+
+//     glm::mat4 modelA(1.0f);
+//     modelA = glm::translate(modelA, fairingPosition + fairingOffsetA);
+//     modelA = glm::scale(modelA, fairingScale);
+//     setMatrices(program, modelA, view, projection);
+//     glUniform3f(glGetUniformLocation(program, "lightPos"), 5.0f, 8.0f, 6.0f);
+//     glUniform3f(glGetUniformLocation(program, "objectColor"),
+//                 0.88f, 0.88f, 0.84f);
+//     fairingHalfA.draw();
+
+//     glm::mat4 modelB(1.0f);
+//     modelB = glm::translate(modelB, fairingPosition + fairingOffsetB);
+//     modelB = glm::scale(modelB, fairingScale);
+//     setMatrices(program, modelB, view, projection);
+//     glUniform3f(glGetUniformLocation(program, "lightPos"), 5.0f, 8.0f, 6.0f);
+//     glUniform3f(glGetUniformLocation(program, "objectColor"),
+//                 0.88f, 0.88f, 0.84f);
+//     fairingHalfB.draw();
+
+//     // Two small orange bands to make stage boundaries visible.
+//     drawCylinder(cylinder, program, view, projection,
+//                  glm::vec3(0.0f, 0.95f, 0.0f),
+//                  glm::vec3(1.46f, 0.12f, 1.46f), orange);
+//     drawCylinder(cylinder, program, view, projection,
+//                  glm::vec3(0.0f, 5.35f, 0.0f),
+//                  glm::vec3(1.13f, 0.10f, 1.13f), orange);
+
+//     // ================= BOOSTER SEPARATION =================
+
+//     // Calculate how far the animation has progressed.
+//     // Separation takes 2 seconds.
+//     float separationProgress = 0.0f;
+
+//     if (boosterSeparationStarted)
+//     {
+//         double elapsed =
+//             glfwGetTime() - boosterSeparationStartTime;
+
+//         separationProgress =
+//             glm::clamp(static_cast<float>(elapsed / 2.0), 0.0f, 1.0f);
+//     }
+
+//     // Smooth the animation so it starts and ends gently.
+//     float t = separationProgress;
+
+//     float smoothProgress =
+//         t * t * (3.0f - 2.0f * t);
+
+//     // Four strap-on boosters.
+//     for (int i = 0; i < 4; ++i)
+//     {
+//         float a = glm::radians(45.0f + 90.0f * i);
+
+//         // Original booster position.
+//         glm::vec3 originalPosition(
+//             0.92f * cos(a),
+//             1.85f,
+//             0.92f * sin(a));
+
+//         // Direction away from the rocket.
+//         glm::vec3 outwardDirection(
+//             cos(a),
+//             0.0f,
+//             sin(a));
+
+//         // Move each booster outward and slightly downward.
+//         glm::vec3 separationOffset =
+//             outwardDirection * (2.2f * smoothProgress) + glm::vec3(0.0f, -0.4f * smoothProgress, 0.0f);
+
+//         glm::vec3 p = originalPosition + separationOffset;
+
+//         // Draw the booster body.
+//         drawCylinder(
+//             cylinder, program, view, projection,
+//             p,
+//             glm::vec3(0.38f, 3.1f, 0.38f),
+//             white);
+
+//         // Draw the booster nose tip.
+//         glm::vec3 tipPos =
+//             p + glm::vec3(0.0f, 1.65f, 0.0f);
+
+//         drawCylinder(
+//             cone, program, view, projection,
+//             tipPos,
+//             glm::vec3(0.38f, 0.48f, 0.38f),
+//             orange);
+//     }
+
+//     // Four simplified solid strap-on boosters around first stage.
+//     // for (int i = 0; i < 4; ++i)
+//     // {
+//     //     float a = glm::radians(45.0f + 90.0f * i);
+//     //     glm::vec3 p(0.92f * cos(a), 1.85f, 0.92f * sin(a));
+//     //     drawCylinder(cylinder, program, view, projection,
+//     //                  p, glm::vec3(0.38f, 3.1f, 0.38f), white);
+
+//     //     // Booster nose tips, narrow cones.
+//     //     glm::vec3 tipPos = p + glm::vec3(0.0f, 1.65f, 0.0f);
+//     //     drawCylinder(cone, program, view, projection,
+//     //                  tipPos, glm::vec3(0.38f, 0.48f, 0.38f), orange);
+//     // }
+
+//     // ================= MANGLAYAAN SPACECRAFT =================
+//     // Keep the spacecraft hidden while the payload fairing is closed.
+//     // Once the fairing has mostly separated, deploy it away from the rocket.
+//     if (fairingSeparationStarted && fairingProgress > 0.65f)
+//     {
+//         const float deploymentProgress = glm::clamp(
+//             (fairingProgress - 0.65f) / 0.35f, 0.0f, 1.0f);
+//         const float deploymentSmooth =
+//             deploymentProgress * deploymentProgress *
+//             (3.0f - 2.0f * deploymentProgress);
+
+//         const glm::vec3 spacecraftCenter(
+//             2.8f * deploymentSmooth, 8.35f, 0.0f);
+
+//         // Main satellite bus.
+//         drawBox(spacecraftCenter,
+//                 glm::vec3(0.70f, 0.52f, 0.52f),
+//                 glm::vec3(0.82f, 0.62f, 0.22f));
+
+//         // Dark connectors between the bus and the solar panels.
+//         for (int side : {-1, 1})
+//         {
+//             drawBox(
+//                 spacecraftCenter + glm::vec3(0.0f, 0.0f, side * 0.43f),
+//                 glm::vec3(0.12f, 0.10f, 0.25f),
+//                 glm::vec3(0.35f, 0.35f, 0.38f));
+//         }
+
+//         // Solar panels and their blue grid lines.
+//         const glm::vec3 panelColor(0.035f, 0.12f, 0.34f);
+//         const glm::vec3 gridColor(0.32f, 0.55f, 0.78f);
+
+//         for (int side : {-1, 1})
+//         {
+//             const glm::vec3 panelCenter =
+//                 spacecraftCenter + glm::vec3(0.0f, 0.0f, side * 1.05f);
+
+//             drawBox(panelCenter,
+//                     glm::vec3(0.72f, 0.045f, 0.88f),
+//                     panelColor);
+
+//             // Grid lines along the panel.
+//             for (int i = -2; i <= 2; ++i)
+//             {
+//                 const float x = i * 0.14f;
+//                 drawBox(panelCenter + glm::vec3(x, 0.026f, 0.0f),
+//                         glm::vec3(0.012f, 0.012f, 0.84f),
+//                         gridColor);
+//             }
+
+//             // Grid lines across the panel.
+//             for (int i = -3; i <= 3; ++i)
+//             {
+//                 const float z = i * 0.12f;
+//                 drawBox(panelCenter + glm::vec3(0.0f, 0.027f, z),
+//                         glm::vec3(0.68f, 0.012f, 0.012f),
+//                         gridColor);
+//             }
+//         }
+
+//         // Antenna mast and small antenna dish.
+//         drawCylinder(
+//             cylinder, program, view, projection,
+//             spacecraftCenter + glm::vec3(0.0f, 0.39f, 0.0f),
+//             glm::vec3(0.035f, 0.30f, 0.035f),
+//             glm::vec3(0.75f, 0.75f, 0.72f));
+
+//         drawCylinder(
+//             cone, program, view, projection,
+//             spacecraftCenter + glm::vec3(0.0f, 0.57f, 0.0f),
+//             glm::vec3(0.12f, 0.08f, 0.12f),
+//             glm::vec3(0.78f, 0.78f, 0.74f));
+//     }
+
+// }
+
+// void processInput(GLFWwindow *window)
+// {
+//     const float angleStep = 1.2f;
+//     const float zoomStep = 0.25f;
+
+//     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+//         glfwSetWindowShouldClose(window, true);
+
+//     if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+//         cameraYaw -= angleStep;
+//     if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+//         cameraYaw += angleStep;
+//     if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+//         cameraPitch = glm::min(cameraPitch + angleStep, 80.0f);
+//     if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+//         cameraPitch = glm::max(cameraPitch - angleStep, -10.0f);
+
+//     if (glfwGetKey(window, GLFW_KEY_LEFT_BRACKET) == GLFW_PRESS)
+//         cameraDistance = glm::max(cameraDistance - zoomStep, 5.0f);
+//     if (glfwGetKey(window, GLFW_KEY_RIGHT_BRACKET) == GLFW_PRESS)
+//         cameraDistance = glm::min(cameraDistance + zoomStep, 45.0f);
+
+//     // Start booster separation when B is pressed.
+//     if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS && !boosterSeparationStarted)
+//     {
+//         boosterSeparationStarted = true;
+//         boosterSeparationStartTime = glfwGetTime();
+//     }
+//     // Start payload fairing separation.
+//     if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS && !fairingSeparationStarted)
+//     {
+//         fairingSeparationStarted = true;
+//         fairingSeparationStartTime = glfwGetTime();
+//     }
+// }
+
+// int main()
+// {
+//     if (!glfwInit())
+//     {
+//         cerr << "Failed to initialize GLFW\n";
+//         return -1;
+//     }
+
+//     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+//     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+//     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+//     GLFWwindow *window = glfwCreateWindow(
+//         WINDOW_WIDTH, WINDOW_HEIGHT, "a2-model-2 - PSLV-C25 and Mangalyaan",
+//         nullptr, nullptr);
+
+//     if (!window)
+//     {
+//         cerr << "Failed to create GLFW window\n";
+//         glfwTerminate();
+//         return -1;
+//     }
+
+//     glfwMakeContextCurrent(window);
+//     glfwSwapInterval(1);
+//     glewExperimental = GL_TRUE;
+
+//     if (glewInit() != GLEW_OK)
+//     {
+//         cerr << "Failed to initialize GLEW\n";
+//         glfwDestroyWindow(window);
+//         glfwTerminate();
+//         return -1;
+//     }
+//     glGetError();
+
+//     glEnable(GL_DEPTH_TEST);
+
+//     GLuint program = 0;
+//     try
+//     {
+//         program = createProgram(
+//             "shaders/rocket_vertex.glsl",
+//             "shaders/rocket_fragment.glsl");
+
+//         Cylinder cylinder(64, false);
+//         Cylinder cone(64, true);
+//         Cube cube;
+
+//         // Two halves of the payload fairing.
+//         Fairing fairingHalfA(0, 36);
+//         Fairing fairingHalfB(1, 36);
+
+//         cout << "a2-model-2 controls:\n"
+//             << "  Arrow keys: orbit camera\n"
+//             << "  [ and ]: zoom in/out\n"
+//             << "  B: separate boosters\n"
+//             << "  F: separate payload fairing\n"
+//             << "  Esc: exit\n";
+
+//         while (!glfwWindowShouldClose(window))
+//         {
+//             processInput(window);
+
+//             int width = 0, height = 0;
+//             glfwGetFramebufferSize(window, &width, &height);
+//             if (height == 0)
+//                 height = 1;
+//             glViewport(0, 0, width, height);
+
+//             glClearColor(0.025f, 0.035f, 0.07f, 1.0f);
+//             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+//             float yaw = glm::radians(cameraYaw);
+//             float pitch = glm::radians(cameraPitch);
+
+//             glm::vec3 target(0.8f, 4.7f, 0.0f);
+//             glm::vec3 cameraPosition(
+//                 target.x + cameraDistance * cos(pitch) * sin(yaw),
+//                 target.y + cameraDistance * sin(pitch),
+//                 target.z + cameraDistance * cos(pitch) * cos(yaw));
+
+//             glm::mat4 view = glm::lookAt(
+//                 cameraPosition, target, glm::vec3(0.0f, 1.0f, 0.0f));
+
+//             glm::mat4 projection = glm::perspective(
+//                 glm::radians(45.0f),
+//                 static_cast<float>(width) / static_cast<float>(height),
+//                 0.1f, 100.0f);
+
+//             // drawRocket(cylinder, cone, cube, program, view, projection);
+//             drawRocket(
+//                 cylinder,
+//                 cone,
+//                 fairingHalfA,
+//                 fairingHalfB,
+//                 cube,
+//                 program,
+//                 view,
+//                 projection);
+
+//             glfwSwapBuffers(window);
+//             glfwPollEvents();
+//         }
+//     }
+//     catch (const exception &e)
+//     {
+//         cerr << "Error: " << e.what() << '\n';
+//     }
+
+//     if (program)
+//         glDeleteProgram(program);
+
+//     glfwDestroyWindow(window);
+//     glfwTerminate();
+//     return 0;
+// }
+
+
+
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
@@ -7,6 +1291,7 @@
 
 #include "../models/Cylinder.h"
 #include "../models/Cube.h"
+#include "../models/Fairing.h"
 
 #include <algorithm>
 #include <cmath>
@@ -32,6 +1317,14 @@ double boosterSeparationStartTime = 0.0;
 // Payload fairing separation.
 bool fairingSeparationStarted = false;
 double fairingSeparationStartTime = 0.0;
+
+// Stage separation: S starts a timed sequence for stages 1, 2, and 3.
+bool stageSeparationStarted = false;
+double stageSeparationStartTime = 0.0;
+
+// Satellite deployment: D releases Mangalyaan from the upper stage.
+bool satelliteDeploymentStarted = false;
+double satelliteDeploymentStartTime = 0.0;
 
 string readFile(const string &path)
 {
@@ -159,8 +1452,8 @@ void drawRotatedCylinder(
 
 void drawRocket(Cylinder &cylinder,
                 Cylinder &cone,
-                Cylinder &fairingHalfA,
-                Cylinder &fairingHalfB,
+                Fairing &fairingHalfA,
+                Fairing &fairingHalfB,
                 Cube &cube,
                 GLuint program,
                 const glm::mat4 &view,
@@ -205,116 +1498,114 @@ void drawRocket(Cylinder &cylinder,
         cube.draw();
     };
 
-    // First stage: largest lower cylinder.
-    drawCylinder(cylinder, program, view, projection,
-                 glm::vec3(0.0f, 1.75f, 0.0f),
-                 glm::vec3(1.45f, 3.5f, 1.45f), white);
+    // ================= ROCKET STAGES =================
+    // Press S to start a simple sequential stage-separation animation.
+    // Each spent lower stage moves downward and fades out of the scene
+    // conceptually by moving well below the visible rocket.
 
-    // Interstage ring above first stage.
-    drawCylinder(cylinder, program, view, projection,
-                 glm::vec3(0.0f, 3.58f, 0.0f),
-                 glm::vec3(1.48f, 0.18f, 1.48f), dark);
+    float stageElapsed = stageSeparationStarted
+        ? static_cast<float>(glfwGetTime() - stageSeparationStartTime)
+        : 0.0f;
 
-    // Second stage.
-    drawCylinder(cylinder, program, view, projection,
-                 glm::vec3(0.0f, 4.65f, 0.0f),
-                 glm::vec3(1.12f, 2.0f, 1.12f), orange);
-
-    // Interstage ring.
-    drawCylinder(cylinder, program, view, projection,
-                 glm::vec3(0.0f, 5.72f, 0.0f),
-                 glm::vec3(1.16f, 0.16f, 1.16f), dark);
-
-    // Third stage.
-    drawCylinder(cylinder, program, view, projection,
-                 glm::vec3(0.0f, 6.65f, 0.0f),
-                 glm::vec3(0.88f, 1.75f, 0.88f), white);
-
-    // Fourth stage (PS4).
-    drawCylinder(cylinder, program, view, projection,
-                 glm::vec3(0.0f, 7.78f, 0.0f),
-                 glm::vec3(0.72f, 0.55f, 0.72f), dark);
-
-    // Payload adapter.
-    drawCylinder(cylinder, program, view, projection,
-                 glm::vec3(0.0f, 8.18f, 0.0f),
-                 glm::vec3(0.62f, 0.28f, 0.62f), gold);
-
-    // Payload fairing: simple pointed cone above the fourth stage.
-    // drawCylinder(cone, program, view, projection,
-    //              glm::vec3(0.0f, 9.05f, 0.0f),
-    //              glm::vec3(1.22f, 1.55f, 1.22f), white);
-
-    // ================= PAYLOAD FAIRING SEPARATION =================
-
-    // The fairing starts separating when F is pressed.
-    // Animation duration: 2 seconds.
-    float fairingProgress = 0.0f;
-
-    if (fairingSeparationStarted)
+    auto stageDrop = [&](float delay)
     {
-        double elapsed =
-            glfwGetTime() - fairingSeparationStartTime;
+        if (!stageSeparationStarted || stageElapsed <= delay)
+            return 0.0f;
 
-        fairingProgress =
-            glm::clamp(
-                static_cast<float>(elapsed / 2.0),
-                0.0f,
-                1.0f);
+        float p = glm::clamp((stageElapsed - delay) / 1.8f, 0.0f, 1.0f);
+        p = p * p * (3.0f - 2.0f * p);
+        return 7.0f * p;
+    };
+
+    // Stage 1 (white lower body) and its interstage ring.
+    // It starts moving after the S sequence begins.
+    float drop1 = stageDrop(0.0f);
+    if (drop1 < 6.95f)
+    {
+        drawCylinder(cylinder, program, view, projection,
+                     glm::vec3(0.0f, 1.75f - drop1, 0.0f),
+                     glm::vec3(1.45f, 3.5f, 1.45f), white);
+        drawCylinder(cylinder, program, view, projection,
+                     glm::vec3(0.0f, 3.58f - drop1, 0.0f),
+                     glm::vec3(1.48f, 0.18f, 1.48f), dark);
+        drawCylinder(cylinder, program, view, projection,
+                     glm::vec3(0.0f, 0.95f - drop1, 0.0f),
+                     glm::vec3(1.46f, 0.12f, 1.46f), orange);
     }
 
-    // Smooth the movement.
+    // Stage 2 (orange body) follows after stage 1 has begun separating.
+    float drop2 = stageDrop(1.8f);
+    if (drop2 < 6.95f)
+    {
+        drawCylinder(cylinder, program, view, projection,
+                     glm::vec3(0.0f, 4.65f - drop2, 0.0f),
+                     glm::vec3(1.12f, 2.0f, 1.12f), orange);
+        drawCylinder(cylinder, program, view, projection,
+                     glm::vec3(0.0f, 5.72f - drop2, 0.0f),
+                     glm::vec3(1.16f, 0.16f, 1.16f), dark);
+        drawCylinder(cylinder, program, view, projection,
+                     glm::vec3(0.0f, 5.35f - drop2, 0.0f),
+                     glm::vec3(1.13f, 0.10f, 1.13f), orange);
+    }
+
+    // Stage 3 (white upper body) follows stage 2.
+    float drop3 = stageDrop(3.6f);
+    if (drop3 < 6.95f)
+    {
+        drawCylinder(cylinder, program, view, projection,
+                     glm::vec3(0.0f, 6.65f - drop3, 0.0f),
+                     glm::vec3(0.88f, 1.75f, 0.88f), white);
+    }
+
+    // Upper/final stage and payload adapter remain attached to the satellite
+    // until the satellite deployment animation is triggered.
+    float upperStageDrop = stageDrop(5.4f);
+    if (upperStageDrop < 6.95f)
+    {
+        drawCylinder(cylinder, program, view, projection,
+                     glm::vec3(0.0f, 7.78f - upperStageDrop, 0.0f),
+                     glm::vec3(0.72f, 0.55f, 0.72f), dark);
+        drawCylinder(cylinder, program, view, projection,
+                     glm::vec3(0.0f, 8.18f - upperStageDrop, 0.0f),
+                     glm::vec3(0.62f, 0.28f, 0.62f), gold);
+    }
+
+    // ================= PAYLOAD FAIRING SEPARATION =================
+    float fairingProgress = 0.0f;
+    if (fairingSeparationStarted)
+    {
+        double elapsed = glfwGetTime() - fairingSeparationStartTime;
+        fairingProgress = glm::clamp(
+            static_cast<float>(elapsed / 2.0), 0.0f, 1.0f);
+    }
+
     float fairingSmooth =
-        fairingProgress * fairingProgress *
-        (3.0f - 2.0f * fairingProgress);
+        fairingProgress * fairingProgress * (3.0f - 2.0f * fairingProgress);
 
-    // Original centre of the fairing.
-    glm::vec3 fairingPosition(0.0f, 9.05f, 0.0f);
+    const glm::vec3 fairingPosition(0.0f, 9.05f, 0.0f);
+    const glm::vec3 fairingScale(1.22f, 1.55f, 1.22f);
 
-    // Original fairing dimensions.
-    glm::vec3 fairingScale(1.22f, 1.55f, 1.22f);
+    // Fairing halves are split along the Z axis in Fairing.cpp.
+    // Therefore, move them along Z rather than X; no extra rotation is needed.
+    float separationDistance = 1.55f * fairingSmooth;
+    glm::vec3 fairingOffsetA(0.0f, 0.0f, -separationDistance);
+    glm::vec3 fairingOffsetB(0.0f, 0.0f,  separationDistance);
 
-    // Move the two halves in opposite directions.
-    float separationDistance = 1.5f * fairingSmooth;
+    glm::mat4 modelA(1.0f);
+    modelA = glm::translate(modelA, fairingPosition + fairingOffsetA);
+    modelA = glm::scale(modelA, fairingScale);
+    setMatrices(program, modelA, view, projection);
+    glUniform3f(glGetUniformLocation(program, "lightPos"), 5.0f, 8.0f, 6.0f);
+    glUniform3f(glGetUniformLocation(program, "objectColor"), 0.88f, 0.88f, 0.84f);
+    fairingHalfA.draw();
 
-    glm::vec3 fairingOffsetA(
-        -separationDistance, 0.0f, 0.0f);
-
-    glm::vec3 fairingOffsetB(
-        separationDistance, 0.0f, 0.0f);
-
-    // Draw the first half.
-    drawRotatedCylinder(
-        fairingHalfA,
-        program,
-        view,
-        projection,
-        fairingPosition + fairingOffsetA,
-        fairingScale,
-        glm::vec3(0.0f, 1.0f, 0.0f),
-        0.0f,
-        white);
-
-    // Draw the second half, rotated 180 degrees.
-    drawRotatedCylinder(
-        fairingHalfB,
-        program,
-        view,
-        projection,
-        fairingPosition + fairingOffsetB,
-        fairingScale,
-        glm::vec3(0.0f, 1.0f, 0.0f),
-        180.0f,
-        white);
-
-
-    // Two small orange bands to make stage boundaries visible.
-    drawCylinder(cylinder, program, view, projection,
-                 glm::vec3(0.0f, 0.95f, 0.0f),
-                 glm::vec3(1.46f, 0.12f, 1.46f), orange);
-    drawCylinder(cylinder, program, view, projection,
-                 glm::vec3(0.0f, 5.35f, 0.0f),
-                 glm::vec3(1.13f, 0.10f, 1.13f), orange);
+    glm::mat4 modelB(1.0f);
+    modelB = glm::translate(modelB, fairingPosition + fairingOffsetB);
+    modelB = glm::scale(modelB, fairingScale);
+    setMatrices(program, modelB, view, projection);
+    glUniform3f(glGetUniformLocation(program, "lightPos"), 5.0f, 8.0f, 6.0f);
+    glUniform3f(glGetUniformLocation(program, "objectColor"), 0.88f, 0.88f, 0.84f);
+    fairingHalfB.draw();
 
     // ================= BOOSTER SEPARATION =================
 
@@ -392,86 +1683,87 @@ void drawRocket(Cylinder &cylinder,
     //                  tipPos, glm::vec3(0.38f, 0.48f, 0.38f), orange);
     // }
 
-    // Mangalyaan orbiter shown beside the rocket so its components are visible.
-    // Simplified box bus and two solar-panel wings.
     // ================= MANGLAYAAN SPACECRAFT =================
+    // Before F: hidden inside the closed fairing.
+    // After F: visible but still attached to the upper stage.
+    // Press D: deploy it away from the rocket and expand it to full size.
 
-    // Position of the spacecraft beside the rocket.
-    glm::vec3 spacecraftCenter(2.8f, 8.0f, 0.0f);
-
-    // 1. Main satellite body: gold thermal insulation.
-    drawBox(
-        spacecraftCenter,
-        glm::vec3(0.85f, 0.65f, 0.65f),
-        glm::vec3(0.82f, 0.62f, 0.22f));
-
-    // 2. Dark mounting sections between body and solar panels.
-    for (int side : {-1, 1})
+    float deployProgress = 0.0f;
+    if (satelliteDeploymentStarted)
     {
-        drawBox(
-            spacecraftCenter + glm::vec3(0.0f, 0.0f, side * 0.55f),
-            glm::vec3(0.16f, 0.12f, 0.35f),
-            glm::vec3(0.35f, 0.35f, 0.38f));
+        float elapsed = static_cast<float>(
+            glfwGetTime() - satelliteDeploymentStartTime);
+        deployProgress = glm::clamp(elapsed / 2.5f, 0.0f, 1.0f);
     }
+    float deploySmooth =
+        deployProgress * deployProgress * (3.0f - 2.0f * deployProgress);
 
-    // 3. Solar panels and their grid lines.
-    glm::vec3 panelColor(0.035f, 0.12f, 0.34f);
-    glm::vec3 gridColor(0.32f, 0.55f, 0.78f);
-
-    for (int side : {-1, 1})
+    if (fairingSeparationStarted)
     {
-        // Centre of this solar panel.
-        glm::vec3 panelCenter =
-            spacecraftCenter + glm::vec3(0.0f, 0.0f, side * 1.45f);
+        // Start compact enough to fit inside the payload fairing.
+        // During D, scale up and move to the side to show deployment.
+        const glm::vec3 stowedCenter(0.0f, 8.75f, 0.0f);
+        const float satelliteScale = 0.28f + 0.72f * deploySmooth;
+        const glm::vec3 deployedOffset(3.8f * deploySmooth, 0.25f * deploySmooth, 0.0f);
+        glm::vec3 spacecraftCenter = stowedCenter + deployedOffset;
 
-        // Main rectangular solar panel.
-        drawBox(
-            panelCenter,
-            glm::vec3(0.95f, 0.055f, 1.45f),
-            panelColor);
-
-        // Grid lines running along the length of the panel.
-        for (int i = -2; i <= 2; ++i)
+        auto drawSatelliteBox = [&](const glm::vec3 &localPosition,
+                                    const glm::vec3 &localSize,
+                                    const glm::vec3 &color)
         {
-            float x = i * 0.16f;
+            drawBox(spacecraftCenter + localPosition * satelliteScale,
+                    localSize * satelliteScale, color);
+        };
 
-            drawBox(
-                panelCenter + glm::vec3(x, 0.032f, 0.0f),
-                glm::vec3(0.012f, 0.012f, 1.40f),
-                gridColor);
+        // Main satellite body.
+        drawSatelliteBox(glm::vec3(0.0f), glm::vec3(0.85f, 0.65f, 0.65f),
+                         glm::vec3(0.82f, 0.62f, 0.22f));
+
+        // Dark panel mounting sections.
+        for (int side : {-1, 1})
+        {
+            drawSatelliteBox(glm::vec3(0.0f, 0.0f, side * 0.55f),
+                             glm::vec3(0.16f, 0.12f, 0.35f),
+                             glm::vec3(0.35f, 0.35f, 0.38f));
         }
 
-        // Cross-lines running across the panel.
-        for (int i = -3; i <= 3; ++i)
+        // Solar panels and their grid lines.
+        const glm::vec3 panelColor(0.035f, 0.12f, 0.34f);
+        const glm::vec3 gridColor(0.32f, 0.55f, 0.78f);
+
+        for (int side : {-1, 1})
         {
-            float z = i * 0.19f;
+            glm::vec3 panelCenter(0.0f, 0.0f, side * 1.45f);
+            drawSatelliteBox(panelCenter, glm::vec3(0.95f, 0.055f, 1.45f), panelColor);
 
-            drawBox(
-                panelCenter + glm::vec3(0.0f, 0.033f, z),
-                glm::vec3(0.92f, 0.012f, 0.012f),
-                gridColor);
+            for (int i = -2; i <= 2; ++i)
+            {
+                float x = i * 0.16f;
+                drawSatelliteBox(panelCenter + glm::vec3(x, 0.032f, 0.0f),
+                                 glm::vec3(0.012f, 0.012f, 1.40f), gridColor);
+            }
+
+            for (int i = -3; i <= 3; ++i)
+            {
+                float z = i * 0.19f;
+                drawSatelliteBox(panelCenter + glm::vec3(0.0f, 0.033f, z),
+                                 glm::vec3(0.92f, 0.012f, 0.012f), gridColor);
+            }
         }
+
+        // Antenna mast and dish. Scale their positions and dimensions too.
+        drawCylinder(
+            cylinder, program, view, projection,
+            spacecraftCenter + glm::vec3(0.0f, 0.48f * satelliteScale, 0.0f),
+            glm::vec3(0.045f, 0.45f, 0.045f) * satelliteScale,
+            glm::vec3(0.75f, 0.75f, 0.72f));
+
+        drawCylinder(
+            cone, program, view, projection,
+            spacecraftCenter + glm::vec3(0.0f, 0.73f * satelliteScale, 0.0f),
+            glm::vec3(0.15f, 0.10f, 0.15f) * satelliteScale,
+            glm::vec3(0.78f, 0.78f, 0.74f));
     }
-
-    // 4. Antenna mast above the spacecraft.
-    drawCylinder(
-        cylinder,
-        program,
-        view,
-        projection,
-        spacecraftCenter + glm::vec3(0.0f, 0.48f, 0.0f),
-        glm::vec3(0.045f, 0.45f, 0.045f),
-        glm::vec3(0.75f, 0.75f, 0.72f));
-
-    // 5. Small dish-like antenna element.
-    drawCylinder(
-        cone,
-        program,
-        view,
-        projection,
-        spacecraftCenter + glm::vec3(0.0f, 0.73f, 0.0f),
-        glm::vec3(0.15f, 0.10f, 0.15f),
-        glm::vec3(0.78f, 0.78f, 0.74f));
 }
 
 void processInput(GLFWwindow *window)
@@ -496,18 +1788,49 @@ void processInput(GLFWwindow *window)
     if (glfwGetKey(window, GLFW_KEY_RIGHT_BRACKET) == GLFW_PRESS)
         cameraDistance = glm::min(cameraDistance + zoomStep, 45.0f);
 
-    // Start booster separation when B is pressed.
-    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS && !boosterSeparationStarted)
+    // Use key-release detection so holding a key does not retrigger it.
+    static bool bWasDown = false;
+    static bool fWasDown = false;
+    static bool sWasDown = false;
+    static bool dWasDown = false;
+
+    bool bDown = glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS;
+    bool fDown = glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS;
+    bool sDown = glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS;
+    bool dDown = glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS;
+
+    if (bDown && !bWasDown && !boosterSeparationStarted)
     {
         boosterSeparationStarted = true;
         boosterSeparationStartTime = glfwGetTime();
     }
-    // Start payload fairing separation.
-    if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS && !fairingSeparationStarted)
+
+    if (fDown && !fWasDown && !fairingSeparationStarted)
     {
         fairingSeparationStarted = true;
         fairingSeparationStartTime = glfwGetTime();
     }
+
+    // Start stage separation after the fairing has been released.
+    if (sDown && !sWasDown && fairingSeparationStarted &&
+        !stageSeparationStarted)
+    {
+        stageSeparationStarted = true;
+        stageSeparationStartTime = glfwGetTime();
+    }
+
+    // Deploy Mangalyaan only after the fairing is open and stage sequence started.
+    if (dDown && !dWasDown && fairingSeparationStarted &&
+        stageSeparationStarted && !satelliteDeploymentStarted)
+    {
+        satelliteDeploymentStarted = true;
+        satelliteDeploymentStartTime = glfwGetTime();
+    }
+
+    bWasDown = bDown;
+    fWasDown = fDown;
+    sWasDown = sDown;
+    dWasDown = dDown;
 }
 
 int main()
@@ -560,15 +1883,17 @@ int main()
         Cube cube;
 
         // Two halves of the payload fairing.
-        Cylinder fairingHalfA(36, true, true);
-        Cylinder fairingHalfB(36, true, true);
+        Fairing fairingHalfA(0, 36);
+        Fairing fairingHalfB(1, 36);
 
-        cout << "a2-model-2 controls:\n"
-            << "  Arrow keys: orbit camera\n"
-            << "  [ and ]: zoom in/out\n"
-            << "  B: separate boosters\n"
-            << "  F: separate payload fairing\n"
-            << "  Esc: exit\n";
+        cout << "a2-model-2 controls:\\n"
+            << "  Arrow keys: orbit camera\\n"
+            << "  [ and ]: zoom in/out\\n"
+            << "  B: separate boosters\\n"
+            << "  F: separate payload fairing / reveal Mangalyaan\\n"
+            << "  S: start sequential stage separation\\n"
+            << "  D: deploy Mangalyaan (after S)\\n"
+            << "  Esc: exit\\n";
 
         while (!glfwWindowShouldClose(window))
         {

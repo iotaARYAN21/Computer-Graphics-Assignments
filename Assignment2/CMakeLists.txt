@@ -39,6 +39,20 @@ add_executable(a2-model-2
     src/common/Mesh.cpp
     src/models/Cylinder.cpp
     src/models/Cube.cpp
+    src/models/Fairing.cpp
 )
 target_include_directories(a2-model-2 PRIVATE ${CMAKE_SOURCE_DIR}/glm)
 target_link_libraries(a2-model-2 PRIVATE OpenGL::GL GLEW::GLEW glfw)
+
+
+# Executable 4: Integrated Scene viewer
+add_executable(a2-scene
+    src/model3/main.cpp
+    src/common/Mesh.cpp
+    src/models/Cylinder.cpp
+    src/models/Cube.cpp
+    src/models/Fairing.cpp
+    src/models/Plane.cpp
+)
+target_include_directories(a2-scene PRIVATE ${CMAKE_SOURCE_DIR}/glm)
+target_link_libraries(a2-scene PRIVATE OpenGL::GL GLEW::GLEW glfw)
