@@ -1,0 +1,187 @@
+# CS5024 Assignment 2 – PSLV-C25 / Mars Orbiter Mission (Mangalyaan)
+
+We recreate the launch of **PSLV-C25** carrying the **Mars Orbiter Mission
+(Mangalyaan)** spacecraft, launched on **5 November 2013 at 14:38 IST
+(09:08 UTC)** from the First Launch Pad, Satish Dhawan Space Centre,
+Sriharikota (13.72° N, 80.23° E).
+
+## Building
+
+Requirements: a C++17 compiler, CMake ≥ 3.10, OpenGL 3.3, GLEW and GLFW 3.
+
+On Ubuntu/Debian:
+
+```bash
+sudo apt install build-essential cmake libglew-dev libglfw3-dev
+```
+
+GLM is expected in `glm/` inside this folder (header-only; we used the
+1.1.0 development version, any 1.x release works). If it is missing:
+
+```bash
+git clone --depth 1 https://github.com/g-truc/glm.git glm
+```
+
+Build:
+
+```bash
+cd Assignment2
+mkdir -p build && cd build
+cmake ..
+make
+```
+
+## Running
+
+The programs load `shaders/` and `textures/` with relative paths, so
+**run them from the `Assignment2` folder**:
+
+```bash
+cd Assignment2
+./build/a2-model-0
+./build/a2-model-1
+./build/a2-model-2
+./build/a2-scene
+```
+
+`textures/ground.jpg` is used as the launch-site ground texture. If it is
+missing, a plain green ground is drawn and a note is printed.
+
+## Executables and controls
+
+### a2-model-0: Earth viewer
+Textured Earth, atmosphere glow and a star background. The camera always
+looks along −Z and is moved by translation only.
+
+| Key | Action |
+|---|---|
+| A / D | rotate Earth about its axis |
+| ← / → | move camera along X |
+| ↑ / ↓ | move camera along Y |
+| [ / ] | move camera along Z (towards / away from Earth) |
+| Esc | exit |
+
+The movement speed scales with the height above the surface, so you can
+fly from a distant space view down to just above the ground.
+
+### a2-model-1: Launch-site viewer
+Launch platform, pedestal, lightning masts and a lattice service tower on a
+textured ground plane.
+
+| Key | Action |
+|---|---|
+| Arrow keys | orbit camera |
+| [ / ] | zoom in / out |
+| Esc | exit |
+
+### a2-model-2: Vehicle and payload viewer
+PSLV with the four main stages (PS1 to PS4), strap-on boosters, a two-piece
+payload fairing and the Mangalyaan spacecraft.
+
+| Key | Action |
+|---|---|
+| Arrow keys, [ / ] | orbit and zoom camera |
+| B | separate strap-on boosters |
+| F | separate payload fairing (reveals Mangalyaan) |
+| S | sequential stage separation (after F) |
+| D | deploy Mangalyaan (after S) |
+| Esc | exit |
+
+### a2-scene: Integrated launch
+Earth, atmosphere, stars, the launch site at Sriharikota and the vehicle
+in one scene.
+
+| Key | Action |
+|---|---|
+| L | lift-off |
+| C | cycle cameras: Earth view → Launch site → Vehicle |
+| Arrow keys | orbit the current camera |
+| [ / ] | zoom the current camera |
+| + / − | time warp (1×, 2×, 5×, 10×, 20×, 50×) |
+| R | reset to the pad |
+| Esc | exit |
+
+The window title shows mission time, altitude, speed, the current stage
+and the time warp. Events are printed in the terminal.
+
+**Cameras**
+- *Earth view*: distant camera around Earth. In this view the flight path
+  is drawn as a thin line, so the whole launch can be followed.
+- *Launch site*: fixed near the pad, always aimed at the vehicle.
+- *Vehicle*: moves with the launch vehicle (and with Mangalyaan after
+  separation).
+
+**Motion.** `src/model3/Flight.cpp` integrates a point-mass model in real
+units (km, km/s) with a fixed 0.02 s step:
+- gravity `μ/r²` always acts;
+- stage thrust acts while a stage is burning, with a gravity-turn pitch
+  program;
+- aerodynamic drag (exponential atmosphere, scale height 8.5 km) acts only
+  **below 100 km**. Above that the motion is drag-free.
+
+Separated boosters, stages and fairing halves become independent bodies
+with gravity and drag only. They fall back to Earth on their own.
+
+**Event sequence** (triggered by altitude, values from the PSLV-C25 flight
+profile):
+
+| Event | Trigger | Simulated |
+|---|---|---|
+| Strap-on separation | 25 km | T+73 s |
+| PS1 separation / PS2 ignition | 58 km | T+121 s |
+| Payload fairing separation | 115 km | T+215 s |
+| PS2 separation / PS3 ignition | 135 km | T+271 s |
+| PS3 separation / PS4 ignition | 195 km | T+473 s |
+| PS4 cut-off | orbital speed reached | T+821 s, ~258 km |
+| Mangalyaan separation | 20 s after cut-off | T+841 s |
+
+After each event the simulation runs at 1× for a few seconds so the
+separation can be seen, then returns to the selected time warp.
+
+**Earth rotation and lighting.** Earth turns at the sidereal rate (scaled
+by the time warp) during the mission. The Sun is fixed in space. Its
+direction is set from the sub-solar point at launch time (declination
+−15.6°, longitude 38.9° E), which puts the Sun in the south-west at
+about 40° elevation over Sriharikota, matching the 14:38 IST launch. The
+sky is blue near the sunlit ground and fades to black space with camera
+altitude.
+
+**Scale.** Earth has radius 30 units. At true scale the 44 m rocket would be
+invisible, so the vehicle, the launch site and the relative motion of
+separated parts are drawn about 140× larger. The trajectory itself uses
+real distances.
+
+## Use of Blender
+No component was modelled in Blender. All geometry (cylinders, cones, cubes,
+fairing halves, the Earth sphere) is generated in code under `src/models/`
+and `src/common/`.
+
+## Project layout
+
+```
+CMakeLists.txt
+shaders/          GLSL shaders (Earth, atmosphere, ground, rocket/cube, stars)
+textures/         earth.jpg, ground.jpg
+src/common/       Mesh, Starfield
+src/models/       Cube, Plane, Cylinder (also cone), Fairing
+src/model0/       a2-model-0
+src/model1/       a2-model-1
+src/model2/       a2-model-2
+src/model3/       a2-scene (main.cpp + Flight.cpp flight model)
+```
+
+## References and acknowledgements
+- ISRO, *PSLV-C25 / Mars Orbiter Mission* brochure and launch press kit
+  (vehicle configuration, flight sequence and event altitudes; add link).
+- Earth texture: `textures/earth.jpg` (equirectangular Earth image; add
+  its source here).
+- Ground texture: `textures/ground.jpg` (add its source here).
+- [stb_image](https://github.com/nothings/stb) by Sean Barrett (public domain / MIT).
+- [GLM](https://github.com/g-truc/glm), [GLFW](https://www.glfw.org/),
+  [GLEW](https://glew.sourceforge.net/).
+
+## Originality declaration
+We declare that the implementation and this report are our own work,
+except for the third-party libraries and resources acknowledged above.
+
+Team members: *(add names and roll numbers)*

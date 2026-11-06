@@ -8,6 +8,11 @@ out vec4 FragColor;
 uniform vec3 lightPos;
 uniform vec3 objectColor;
 
+// Used by the exhaust plume in a2-scene. The defaults give the normal
+// lit, opaque look used everywhere else.
+uniform float emissive = 0.0; // 1.0 = self-lit, ignores the light
+uniform float alpha = 1.0;
+
 void main()
 {
     vec3 norm = normalize(Normal);
@@ -18,5 +23,6 @@ void main()
     vec3 ambient = 0.2 * objectColor;
     vec3 diffuse = diff * objectColor;
 
-    FragColor = vec4(ambient + diffuse, 1.0);
+    vec3 color = mix(ambient + diffuse, objectColor, emissive);
+    FragColor = vec4(color, alpha);
 }

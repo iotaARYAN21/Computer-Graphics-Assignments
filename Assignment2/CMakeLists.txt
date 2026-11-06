@@ -5,16 +5,16 @@ project(assignment2 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(OpenGL_GL_PREFERENCE GLVND)
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(glfw3 REQUIRED)
-
-# add_executable(a2-model-0 src/main.cpp src/common/Mesh.cpp src/models/Cube.cpp src/models/Plane.cpp)
 
 # Executable 1: Earth viewer
 add_executable(a2-model-0
     src/model0/main.cpp
     src/common/Mesh.cpp
+    src/common/Starfield.cpp
 )
 
 # Executable 2: Launch-site viewer
@@ -48,7 +48,9 @@ target_link_libraries(a2-model-2 PRIVATE OpenGL::GL GLEW::GLEW glfw)
 # Executable 4: Integrated Scene viewer
 add_executable(a2-scene
     src/model3/main.cpp
+    src/model3/Flight.cpp
     src/common/Mesh.cpp
+    src/common/Starfield.cpp
     src/models/Cylinder.cpp
     src/models/Cube.cpp
     src/models/Fairing.cpp

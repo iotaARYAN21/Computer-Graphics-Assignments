@@ -9,6 +9,9 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/constants.hpp>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "../stb_image.h"
+
 #include "../models/Cube.h"
 #include "../models/Plane.h"
 
@@ -96,6 +99,42 @@ GLuint createProgram(const string& vertexPath, const string& fragmentPath)
         throw runtime_error("Could not link shader program.");
 
     return program;
+}
+
+// Loads a repeating texture. Returns 0 (and prints a note) if the file is
+// missing, so the program can still run with a plain colour.
+GLuint loadTexture(const char* path)
+{
+    int width = 0, height = 0, channels = 0;
+    stbi_set_flip_vertically_on_load(true);
+    unsigned char* image = stbi_load(path, &width, &height, &channels, 0);
+    if (!image)
+    {
+        cerr << "Note: could not load " << path
+             << ", using a plain ground colour instead.\n";
+        return 0;
+    }
+
+    GLenum format = GL_RGB;
+    if (channels == 1) format = GL_RED;
+    else if (channels == 4) format = GL_RGBA;
+
+    GLuint texture = 0;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0,
+                 format, GL_UNSIGNED_BYTE, image);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    stbi_image_free(image);
+    return texture;
 }
 
 void setMatrices(GLuint program, const glm::mat4& model,
@@ -213,6 +252,7 @@ int main()
         return -1;
     }
     glfwMakeContextCurrent(window);
+    glfwSwapInterval(1); // vsync, keeps camera speed independent of GPU speed
 
     glewExperimental = GL_TRUE;
     if (glewInit() != GLEW_OK)
@@ -237,6 +277,7 @@ int main()
 
         Cube cube;
         Plane ground;
+        GLuint groundTexture = loadTexture("textures/ground.jpg");
 
         cout << "Controls:\n"
              << "  Arrow keys: orbit camera\n"
@@ -270,11 +311,17 @@ int main()
                 static_cast<float>(width) / static_cast<float>(height),
                 0.1f, 100.0f);
 
-            // Large green ground plane.
+            // Large textured ground plane.
             glUseProgram(groundProgram);
             glm::mat4 groundModel(1.0f);
             setMatrices(groundProgram, groundModel, view, projection);
+            glUniform1i(glGetUniformLocation(groundProgram, "useTexture"),
+                        groundTexture != 0);
+            glUniform1i(glGetUniformLocation(groundProgram, "groundTexture"), 0);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, groundTexture);
             ground.draw();
+            glBindTexture(GL_TEXTURE_2D, 0);
 
             // Main concrete launch platform.
             drawCube(cube, cubeProgram, view, projection,
@@ -424,6 +471,7 @@ int main()
             glfwSwapBuffers(window);
             glfwPollEvents();
         }
+        if (groundTexture) glDeleteTextures(1, &groundTexture);
         glDeleteProgram(cubeProgram);
         glDeleteProgram(groundProgram);
     }

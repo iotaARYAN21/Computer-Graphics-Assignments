@@ -9,6 +9,7 @@
 #include "../stb_image.h"
 
 #include "../common/Mesh.h"
+#include "../common/Starfield.h"
 
 #include <cmath>
 #include <fstream>
@@ -192,43 +193,47 @@ void generateSphere(float radius, int stacks, int sectors)
     }
 }
 
-// Orbit camera: yaw rotates around Earth, pitch changes viewing latitude,
-// and distance controls how near to/far from Earth's surface the camera is.
-float cameraYaw = 0.0f;
-float cameraPitch = 0.0f;
-float cameraDistance = 5.0f;
+// Camera position in world space. Earth is a unit sphere at the origin.
+// The camera always looks along -Z and is moved by pure translation:
+// arrow keys move it along X and Y, [ and ] move it along Z.
+glm::vec3 cameraPos(0.0f, 0.0f, 4.0f);
+
+const float MIN_CAMERA_RADIUS = 1.015f; // just above the surface
+const float MAX_CAMERA_RADIUS = 50.0f;
 
 void processInput(GLFWwindow* window, float deltaTime, float& earthRotation)
 {
     const float rotationSpeed = 70.0f * deltaTime;
-    const float zoomSpeed = 2.5f * deltaTime;
 
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
-    // Orbit around Earth (left/right).
+    // Move slower near the surface so close-up views are easy to control.
+    float altitude = glm::length(cameraPos) - 1.0f;
+    float moveSpeed = 1.5f * glm::max(altitude, 0.02f) * deltaTime;
+
     if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
-        cameraYaw -= rotationSpeed;
+        cameraPos.x -= moveSpeed;
     if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
-        cameraYaw += rotationSpeed;
-
-    // Change viewing latitude (up/down).
+        cameraPos.x += moveSpeed;
     if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
-        cameraPitch += rotationSpeed;
+        cameraPos.y += moveSpeed;
     if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
-        cameraPitch -= rotationSpeed;
-
-    // Zoom: close to the surface or back out into space.
+        cameraPos.y -= moveSpeed;
     if (glfwGetKey(window, GLFW_KEY_LEFT_BRACKET) == GLFW_PRESS)
-        cameraDistance -= zoomSpeed;
+        cameraPos.z -= moveSpeed;
     if (glfwGetKey(window, GLFW_KEY_RIGHT_BRACKET) == GLFW_PRESS)
-        cameraDistance += zoomSpeed;
+        cameraPos.z += moveSpeed;
 
-    // Keep the camera outside Earth and within a useful space-view range.
-    cameraDistance = glm::clamp(cameraDistance, 1.08f, 50.0f);
-    cameraPitch = glm::clamp(cameraPitch, -85.0f, 85.0f);
+    // Keep the camera outside Earth and within a useful range.
+    float radius = glm::length(cameraPos);
+    if (radius < MIN_CAMERA_RADIUS)
+        cameraPos *= MIN_CAMERA_RADIUS / radius;
+    else if (radius > MAX_CAMERA_RADIUS)
+        cameraPos *= MAX_CAMERA_RADIUS / radius;
 
-    // Rotate Earth independently.
+    // Rotate Earth about its own (Y) axis. glfwGetKey works on physical
+    // keys, so both 'a'/'A' and 'd'/'D' are handled.
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
         earthRotation -= rotationSpeed;
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
@@ -279,6 +284,7 @@ int main()
     GLuint earthTexture = 0;
     GLuint earthProgram = 0;
     GLuint atmosphereProgram = 0;
+    GLuint starProgram = 0;
 
     try
     {
@@ -291,6 +297,17 @@ int main()
         atmosphereProgram = createShaderProgram(
             "shaders/atmosphere_vertex.glsl",
             "shaders/atmosphere_fragment.glsl");
+        starProgram = createShaderProgram(
+            "shaders/star_vertex.glsl", "shaders/star_fragment.glsl");
+        auto stars = make_unique<Starfield>();
+        glEnable(GL_PROGRAM_POINT_SIZE);
+
+        cout << "a2-model-0 controls:\n"
+             << "  A / D        : rotate Earth about its axis\n"
+             << "  Left / Right : move camera along X\n"
+             << "  Up / Down    : move camera along Y\n"
+             << "  [ / ]        : move camera along Z (towards / away)\n"
+             << "  Esc          : exit\n";
 
         glUseProgram(earthProgram);
         glUniform3f(glGetUniformLocation(earthProgram, "lightPos"),
@@ -313,32 +330,30 @@ int main()
             if (height == 0) height = 1;
             glViewport(0, 0, width, height);
 
-            glClearColor(0.02f, 0.02f, 0.08f, 1.0f);
+            glClearColor(0.0f, 0.0f, 0.02f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            // Orbit camera around the origin (Earth).
-            const float yaw = glm::radians(cameraYaw);
-            const float pitch = glm::radians(cameraPitch);
-
-            glm::vec3 cameraPos;
-            cameraPos.x = cameraDistance * cos(pitch) * sin(yaw);
-            cameraPos.y = cameraDistance * sin(pitch);
-            cameraPos.z = cameraDistance * cos(pitch) * cos(yaw);
-
+            // Fixed viewing direction (-Z); only the position changes.
             const glm::mat4 view = glm::lookAt(
                 cameraPos,
-                glm::vec3(0.0f, 0.0f, 0.0f),
+                cameraPos + glm::vec3(0.0f, 0.0f, -1.0f),
                 glm::vec3(0.0f, 1.0f, 0.0f));
 
             const glm::mat4 projection = glm::perspective(
                 glm::radians(45.0f),
                 static_cast<float>(width) / static_cast<float>(height),
-                0.01f, 200.0f);
+                0.002f, 200.0f);
 
             const glm::mat4 earthModel = glm::rotate(
                 glm::mat4(1.0f),
                 glm::radians(earthRotation),
                 glm::vec3(0.0f, 1.0f, 0.0f));
+
+            // Stars in the background (no depth test, drawn first).
+            glDisable(GL_DEPTH_TEST);
+            setMatrixUniforms(starProgram, glm::mat4(1.0f), view, projection);
+            stars->draw();
+            glEnable(GL_DEPTH_TEST);
 
             // Atmosphere first.
             glm::mat4 atmosphereModel = glm::scale(
@@ -364,6 +379,7 @@ int main()
 
         // Ensure Mesh is destroyed while the OpenGL context still exists.
         earthMesh.reset();
+        stars.reset();
     }
     catch (const exception& e)
     {
@@ -373,6 +389,7 @@ int main()
     if (earthTexture) glDeleteTextures(1, &earthTexture);
     if (earthProgram) glDeleteProgram(earthProgram);
     if (atmosphereProgram) glDeleteProgram(atmosphereProgram);
+    if (starProgram) glDeleteProgram(starProgram);
 
     glfwDestroyWindow(window);
     glfwTerminate();
