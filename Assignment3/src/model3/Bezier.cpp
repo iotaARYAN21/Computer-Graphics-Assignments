@@ -1,15 +1,14 @@
 #include "Bezier.h"
-
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-
-glm::vec3 evaluateBezier(const ControlPoints& points, float u)
+//Calculate a point on a Bezier curve
+glm::vec3 evaluateBezier(const ControlPoints& points,float u)
 {
-    if (points.empty())
+    if(points.empty())
         return glm::vec3(0.0f);
 
-    // Repeated linear interpolation between neighbouring points.
+    // Repeated linear Interpolation between neighbouring points.
     ControlPoints work = points;
     for (size_t level = work.size() - 1; level > 0; --level)
         for (size_t i = 0; i < level; ++i)
@@ -28,7 +27,7 @@ std::vector<glm::vec3> sampleBezier(const ControlPoints& points, int samples)
         result.push_back(evaluateBezier(points, static_cast<float>(i) / (samples - 1)));
     return result;
 }
-
+//Save control points
 bool appendTrajectory(const std::string& path, const ControlPoints& points)
 {
     std::ofstream file(path, std::ios::app);
@@ -51,13 +50,11 @@ std::vector<ControlPoints> loadTrajectories(const std::string& path)
 
     int count = 0;
     while (file >> count)
-    {
-        if (count <= 0)
+    {   if (count <= 0)
         {
             std::cerr << "trajectory file: bad point count " << count << '\n';
             break;
         }
-
         ControlPoints points;
         for (int i = 0; i < count; ++i)
         {
