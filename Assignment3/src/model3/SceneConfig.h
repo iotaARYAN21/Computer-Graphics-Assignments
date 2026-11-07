@@ -76,7 +76,8 @@ inline glm::vec3 surfaceDirection(float lat, float lon)
 // trajectory.txt: which block is which object
 // ---------------------------------------------------------------------------
 // Coordinates are world units (Earth radius 30, Earth centre at the origin).
-// Each separated part's path starts on the vehicle path at its separation.
+// Each separated part's path starts on the vehicle path at its separation,
+// and each of Mangalyaan's later paths starts where the previous one ends.
 enum TrajectoryId
 {
     TRAJ_VEHICLE = 0, // launch vehicle (whatever is still attached)
@@ -88,8 +89,20 @@ enum TrajectoryId
     TRAJ_PAYLOAD,     // Mangalyaan after separation
     TRAJ_CAMERA_EYE,
     TRAJ_CAMERA_TARGET,
+    // After the launch: Mangalyaan's own path, one curve per mission phase,
+    // each followed by its own camera eye / target pair.
+    TRAJ_ORBIT_RAISING, // growing Earth orbits, burns at each perigee
+    TRAJ_CRUISE,        // Trans-Mars Injection -> Mars
+    TRAJ_MARS_ORBIT,    // after Mars Orbit Insertion
+    TRAJ_EYE_ORBIT, TRAJ_TARGET_ORBIT,
+    TRAJ_EYE_CRUISE, TRAJ_TARGET_CRUISE,
+    TRAJ_EYE_MARS, TRAJ_TARGET_MARS,
     TRAJ_COUNT
 };
+
+// Mangalyaan is drawn this much larger after the launch so it can still be
+// seen next to Earth and Mars.
+const float PAYLOAD_SPACE_SCALE = 150.0f;
 
 // Separated parts are animated for this long after separation.
 const float DEBRIS_WINDOW_S = 10.0f;

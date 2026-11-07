@@ -200,24 +200,28 @@ the origin).
 
 ### Keyframe animation
 
-**Trajectories.** `trajectory.txt` holds 9 Bézier curves, in this order:
+**Trajectories.** `trajectory.txt` holds 18 Bézier curves, in this order:
 
 | # | Object | # | Object |
 |---|---|---|---|
-| 1 | launch vehicle | 6 | PS3 |
-| 2 | strap-on boosters (all four) | 7 | Mangalyaan after separation |
-| 3 | PS1 | 8 | camera eye |
-| 4 | payload fairing (both halves) | 9 | camera look-at target |
-| 5 | PS2 | | |
+| 1 | launch vehicle | 10 | Mangalyaan: Earth orbit raising |
+| 2 | strap-on boosters (all four) | 11 | Mangalyaan: cruise to Mars |
+| 3 | PS1 | 12 | Mangalyaan: Mars orbit |
+| 4 | payload fairing (both halves) | 13, 14 | camera eye / target, orbit raising |
+| 5 | PS2 | 15, 16 | camera eye / target, cruise |
+| 6 | PS3 | 17, 18 | camera eye / target, Mars orbit |
+| 7 | Mangalyaan after separation | | |
+| 8, 9 | camera eye / target, launch | | |
 
-Each separated part's curve starts on the vehicle curve at its separation.
-Blocks added later with `T` (number 10 and up) are shown by `Y` but are not
-used by the animation.
+Each separated part's curve starts on the vehicle curve at its separation,
+and each of Mangalyaan's curves starts where the previous one ends. Blocks
+added later with `T` (number 19 and up) are shown by `Y` but are not used
+by the animation.
 
 **Keyframes.** Each row of `keyframes.txt` is one keyframe:
 
 ```
-active_1 u_1  active_2 u_2  ...  active_9 u_9   stage engine tilt
+active_1 u_1  active_2 u_2  ...  active_18 u_18   stage engine tilt
 ```
 
 - `active_i` (0/1) shows or hides object *i*, and `u_i` is its position on
@@ -225,7 +229,8 @@ active_1 u_1  active_2 u_2  ...  active_9 u_9   stage engine tilt
 - `stage` (0–6) counts the parts dropped so far: 0 on the pad, then
   strap-ons, PS1, fairing, PS2, PS3, Mangalyaan. Parts still attached are
   drawn on the vehicle.
-- `engine` (0/1) shows the exhaust of the stage that is firing.
+- `engine` (0/1) shows the exhaust of the stage that is firing (after the
+  launch: Mangalyaan's own engine).
 - `tilt` is the vehicle's angle from the local vertical, in degrees. Each
   separated part keeps the tilt it had at separation and tumbles slowly.
 
@@ -249,8 +254,9 @@ ascent with a point-mass model (`src/model3/Flight.cpp`):
 
 Separations are triggered at the altitudes of the PSLV-C25 flight profile.
 The planner then fits a Bézier curve to the path of every part (least
-squares with fixed end points, degree raised until the error is under
-about 1% of the rocket's height for the vehicle) and writes both files.
+squares with fixed end points, degree raised until the error is small;
+for the single vehicle curve the worst case is about 6% of the rocket's
+height) and writes both files.
 It will not overwrite existing files unless run with `--overwrite`, in
 which case the old files are kept as `.bak`.
 
@@ -263,6 +269,34 @@ which case the old files are kept as `.bak`.
 | PS3 separation / PS4 ignition | 195 km | T+473 s |
 | PS4 cut-off | orbital speed | T+821 s, ~258 km |
 | Mangalyaan separation | 20 s after cut-off | T+841 s |
+
+### The rest of the mission
+
+After separating in Earth orbit, the real Mangalyaan raised its orbit
+with six burns at perigee (November 2013). The Trans-Mars Injection burn
+on 1 December 2013 sent it on a ~300-day cruise, and the Mars Orbit
+Insertion burn on 24 September 2014 put it into an elliptical orbit around
+Mars. The animation shows this in shortened form (distances and durations
+are not to scale; Mars stays where it was on launch day):
+
+1. **Earth orbit raising:** two orbits whose apogee grows while the
+   perigee stays low, with a burn at each perigee.
+2. **Cruise:** a cubic Bézier from the last perigee (Trans-Mars Injection
+   burn) to a point beside Mars (Mars Orbit Insertion burn).
+3. **Mars orbit:** one elliptical orbit around Mars.
+
+Mangalyaan is drawn 150× larger in these phases so it stays visible, and
+its path so far is drawn as a line. Each phase has its own camera
+eye/target pair:
+- orbit raising: looking down on the point midway between Earth and
+  Mangalyaan;
+- cruise: following from behind, with Mars ahead;
+- Mars orbit: looking down on the point midway between Mars and Mangalyaan.
+
+These camera curves are the payload curve's control points scaled or
+shifted, and scaling or moving a Bézier curve's control points scales or
+moves the curve exactly, so the camera follows the spacecraft precisely.
+The cut between phases is a planned camera change.
 
 ## Use of Blender
 No component was modelled in Blender. All geometry (cylinders, cones, cubes,

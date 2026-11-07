@@ -137,6 +137,7 @@ int main(int argc, char** argv)
     printf("Fitting Bezier curves:\n");
     vector<ControlPoints> traj(TRAJ_COUNT);
     vector<double> start(TRAJ_COUNT, 0.0), length(TRAJ_COUNT, tEnd);
+    for (int i = TRAJ_ORBIT_RAISING; i < TRAJ_COUNT; ++i) start[i] = 1e18; // not used during the launch
 
     vector<Sample> s;
     for (const Record& r : rec) s.push_back({r.t, r.vehicle});
@@ -194,6 +195,65 @@ int main(int argc, char** argv)
     traj[TRAJ_CAMERA_EYE] = fitPath("camera eye", eye, 0.5 * ROCKET_SCALE);
     traj[TRAJ_CAMERA_TARGET] = fitPath("camera target", target, 0.3 * ROCKET_SCALE);
 
+    // ---- After the launch: Mangalyaan's own mission (shapes, not to scale) ----
+    // 1. Orbit raising: two orbits whose apogee grows while the perigee
+    //    stays low, as after each of the real perigee burns.
+    glm::dvec3 p0 = glm::dvec3(evaluateBezier(traj[TRAJ_PAYLOAD], 1.0f));
+    glm::dvec3 d0 = p0 - glm::dvec3(evaluateBezier(traj[TRAJ_PAYLOAD], 0.95f));
+    double r0 = glm::length(p0);
+    glm::dvec3 e1 = p0 / r0;
+    glm::dvec3 e2 = glm::normalize(d0 - glm::dot(d0, e1) * e1);
+    glm::dvec3 orbitNormal = glm::cross(e1, e2);
+    s.clear();
+    for (int i = 0; i <= 400; ++i)
+    {
+        double th = 4.0 * M_PI * i / 400.0, e = 0.05 + 0.55 * i / 400.0;
+        s.push_back({double(i), r0 * (1.0 + e) / (1.0 + e * cos(th)) * (cos(th) * e1 + sin(th) * e2)});
+    }
+    traj[TRAJ_ORBIT_RAISING] = fitPath("orbit raising", s, 0.3);
+
+    // 2. Cruise: a cubic Bezier from the last perigee (Trans-Mars Injection)
+    //    to a point beside Mars (Mars Orbit Insertion).
+    glm::dvec3 mars = glm::dvec3(surfaceDirection(MARS_LATITUDE, MARS_LONGITUDE)) * double(MARS_DISTANCE);
+    glm::dvec3 approach = glm::normalize(mars - p0);
+    glm::dvec3 side = glm::normalize(glm::cross(approach, orbitNormal));
+    double rm = 1.5 * MARS_RADIUS;
+    glm::dvec3 arrival = mars + side * rm;
+    double span = glm::length(arrival - p0);
+    traj[TRAJ_CRUISE] = {glm::vec3(p0), glm::vec3(p0 + e2 * (0.35 * span)),
+                         glm::vec3(arrival - approach * (0.35 * span)), glm::vec3(arrival)};
+    double closest = 1e9;
+    for (int i = 0; i <= 200; ++i) closest = min(closest, double(glm::length(evaluateBezier(traj[TRAJ_CRUISE], i / 200.0f))));
+    printf("  cruise         4 control points, closest to Earth's centre %.1f (radius %.0f)\n", closest, EARTH_RADIUS);
+
+    // 3. Mars orbit: one elliptical orbit with periapsis at the arrival point.
+    s.clear();
+    for (int i = 0; i <= 200; ++i)
+    {
+        double th = 2.0 * M_PI * i / 200.0, e = 0.6;
+        s.push_back({double(i), mars + rm * (1.0 + e) / (1.0 + e * cos(th)) * (cos(th) * side + sin(th) * approach)});
+    }
+    traj[TRAJ_MARS_ORBIT] = fitPath("Mars orbit", s, 0.3);
+    glm::dvec3 marsNormal = glm::cross(side, approach);
+
+    // Cameras for these phases. Scaling or moving the control points scales
+    // or moves the curve exactly, so each camera follows the spacecraft
+    // without any fitting.
+    auto mapped = [](const ControlPoints& c, double scale, glm::dvec3 offset) {
+        ControlPoints out;
+        for (const glm::vec3& p : c) out.push_back(glm::vec3(glm::dvec3(p) * scale + offset));
+        return out;
+    };
+    // Orbit raising: look down on the midpoint between Earth and Mangalyaan.
+    traj[TRAJ_TARGET_ORBIT] = mapped(traj[TRAJ_ORBIT_RAISING], 0.5, glm::dvec3(0.0));
+    traj[TRAJ_EYE_ORBIT] = mapped(traj[TRAJ_ORBIT_RAISING], 0.5, orbitNormal * 170.0);
+    // Cruise: follow from behind, looking ahead towards Mars.
+    traj[TRAJ_TARGET_CRUISE] = traj[TRAJ_CRUISE];
+    traj[TRAJ_EYE_CRUISE] = mapped(traj[TRAJ_CRUISE], 1.0, -approach * 25.0 + orbitNormal * 8.0);
+    // Mars orbit: look down on the midpoint between Mars and Mangalyaan.
+    traj[TRAJ_TARGET_MARS] = mapped(traj[TRAJ_MARS_ORBIT], 0.5, mars * 0.5);
+    traj[TRAJ_EYE_MARS] = mapped(traj[TRAJ_MARS_ORBIT], 0.5, mars * 0.5 + marsNormal * 140.0);
+
     for (const ControlPoints& c : traj) appendTrajectory("trajectory.txt", c);
 
     // ---- Keyframes, with extra ones around each separation (slow motion) ----
@@ -227,10 +287,36 @@ int main(int argc, char** argv)
         key.extra = {float(stage), float(engine), k == 0 ? 0.0f : float(r->tilt)};
         keys.push_back(key);
     }
+
+    // Keyframes after the launch: positions on each phase's curve, and the
+    // intervals with a burn (engine = 1): the two perigee burns, Trans-Mars
+    // Injection at the start of the cruise and Mars Orbit Insertion at its end.
+    struct Section { int path, eye, target; vector<float> u; vector<int> burn; };
+    vector<Section> sections = {
+        {TRAJ_ORBIT_RAISING, TRAJ_EYE_ORBIT, TRAJ_TARGET_ORBIT, {0, .04f, .25f, .46f, .5f, .54f, .75f, .96f}, {1, 0, 0, 0, 1, 0, 0, 0}},
+        {TRAJ_CRUISE, TRAJ_EYE_CRUISE, TRAJ_TARGET_CRUISE, {0, .05f, .3f, .55f, .8f, .95f}, {1, 0, 0, 0, 0, 1}},
+        {TRAJ_MARS_ORBIT, TRAJ_EYE_MARS, TRAJ_TARGET_MARS, {0, .25f, .5f, .75f, 1}, {0, 0, 0, 0, 0}}};
+    Keyframe base = keys.back();
+    for (size_t sec = 0; sec < sections.size(); ++sec)
+        for (size_t j = 0; j < sections[sec].u.size(); ++j)
+        {
+            Keyframe key = base;
+            for (int i = 0; i < TRAJ_COUNT; ++i) key.active[i] = 0;
+            for (size_t prev = 0; prev < sec; ++prev) // finished phases end at u = 1
+                for (int id : {sections[prev].path, sections[prev].eye, sections[prev].target}) key.u[id] = 1.0f;
+            for (int id : {sections[sec].path, sections[sec].eye, sections[sec].target})
+            {
+                key.active[id] = 1;
+                key.u[id] = sections[sec].u[j];
+            }
+            key.extra[FIELD_ENGINE] = float(sections[sec].burn[j]);
+            keys.push_back(key);
+        }
     saveKeyframes("keyframes.txt", keys,
-                  "# a3-scene keyframes (written by a3-plan). Each row: 'active u' for the 9\n"
+                  "# a3-scene keyframes (written by a3-plan). Each row: 'active u' for the 18\n"
                   "# trajectories (vehicle, boosters, PS1, fairing, PS2, PS3, Mangalyaan,\n"
-                  "# camera eye, camera target), then: stage engine tilt(deg)\n");
+                  "# camera eye, camera target, orbit raising, cruise, Mars orbit, then camera\n"
+                  "# eye/target for those three), then: stage engine tilt(deg)\n");
     printf("Wrote %d trajectories and %zu keyframes\n", int(TRAJ_COUNT), keys.size());
     return 0;
 }
