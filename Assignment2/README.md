@@ -88,8 +88,8 @@ payload fairing and the Mangalyaan spacecraft.
 | Esc | exit |
 
 ### a2-scene: Integrated launch
-Earth, atmosphere, stars, the launch site at Sriharikota and the vehicle
-in one scene.
+Earth, atmosphere, stars, the Sun, Mars, the launch site at Sriharikota
+and the vehicle in one scene.
 
 | Key | Action |
 |---|---|
@@ -106,7 +106,8 @@ and the time warp. Events are printed in the terminal.
 
 **Cameras**
 - *Earth view*: distant camera around Earth. In this view the flight path
-  is drawn as a thin line, so the whole launch can be followed.
+  is drawn as a thin line, so the whole launch can be followed. Zoom out
+  and orbit to see Mars and the Sun.
 - *Launch site*: fixed near the pad, always aimed at the vehicle.
 - *Vehicle*: moves with the launch vehicle (and with Mangalyaan after
   separation).
@@ -140,11 +141,24 @@ separation can be seen, then returns to the selected time warp.
 
 **Earth rotation and lighting.** Earth turns at the sidereal rate (scaled
 by the time warp) during the mission. The Sun is fixed in space. Its
-direction is set from the sub-solar point at launch time (declination
-−15.6°, longitude 38.9° E), which puts the Sun in the south-west at
-about 40° elevation over Sriharikota, matching the 14:38 IST launch. The
-sky is blue near the sunlit ground and fades to black space with camera
+direction at launch time (RA 220.5°, Dec −15.7°, computed from the JPL
+approximate planetary elements) puts the Sun in the south-west at about
+40° elevation over Sriharikota, matching the 14:38 IST launch. The sky is
+blue near the sunlit ground and fades to black space with camera
 altitude.
+
+**Celestial bodies.** Mangalyaan is a Mars mission, so the scene includes:
+- *Mars*: textured sphere, lit by the Sun and slowly rotating (one sol =
+  24.6 h). It is placed in its real direction on launch day (RA 164.1°,
+  Dec +8.5°, in Leo, 1.89 AU away), so it is a morning planet and below
+  the horizon at Sriharikota during the launch.
+- *The Sun*: a self-lit disc in the same direction as the scene light,
+  visible in the daytime sky from the launch-site camera.
+
+The Moon is not needed for this mission and is not included. Mars and
+the Sun are drawn in their correct directions but much closer than real
+(Mars 800 units, Sun 1500 units, against an Earth radius of 30). Mars keeps
+its real size relative to Earth; the Sun is shrunk to a small disc.
 
 **Scale.** Earth has radius 30 units. At true scale the 44 m rocket would be
 invisible, so the vehicle, the launch site and the relative motion of
@@ -153,7 +167,7 @@ real distances.
 
 ## Use of Blender
 No component was modelled in Blender. All geometry (cylinders, cones, cubes,
-fairing halves, the Earth sphere) is generated in code under `src/models/`
+fairing halves, the Earth, Mars and Sun spheres) is generated in code under `src/models/`
 and `src/common/`.
 
 ## Project layout
@@ -161,7 +175,7 @@ and `src/common/`.
 ```
 CMakeLists.txt
 shaders/          GLSL shaders (Earth, atmosphere, ground, rocket/cube, stars)
-textures/         earth.jpg, ground.jpg
+textures/         earth.jpg, Mars.jpg, ground.jpg
 src/common/       Mesh, Starfield
 src/models/       Cube, Plane, Cylinder (also cone), Fairing
 src/model0/       a2-model-0
@@ -175,7 +189,10 @@ src/model3/       a2-scene (main.cpp + Flight.cpp flight model)
   (vehicle configuration, flight sequence and event altitudes; add link).
 - Earth texture: `textures/earth.jpg` (equirectangular Earth image; add
   its source here).
+- Mars texture: `textures/Mars.jpg` (add its source here).
 - Ground texture: `textures/ground.jpg` (add its source here).
+- E. M. Standish, *Keplerian Elements for Approximate Positions of the
+  Major Planets* (JPL), used for the Sun and Mars directions at launch.
 - [stb_image](https://github.com/nothings/stb) by Sean Barrett (public domain / MIT).
 - [GLM](https://github.com/g-truc/glm), [GLFW](https://www.glfw.org/),
   [GLEW](https://glew.sourceforge.net/).

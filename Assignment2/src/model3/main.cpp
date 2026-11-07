@@ -58,11 +58,28 @@ const float SITE_LATITUDE = 13.72f;
 const float SITE_LONGITUDE = 80.23f;
 const double LAUNCH_AZIMUTH = 104.0; // degrees from north, over the Bay of Bengal
 
-// Sub-solar point at launch time (solar declination about -15.6 deg on
-// 5 Nov, and 09:08 UTC plus the equation of time gives about 38.9 deg E).
-// This puts the Sun in the south-west sky at Sriharikota, i.e. afternoon.
-const float SUN_LATITUDE = -15.6f;
-const float SUN_LONGITUDE = 38.9f;
+// Directions of the Sun and Mars at launch time, written as the point on
+// Earth where each one is overhead (latitude = declination, longitude =
+// right ascension - Greenwich sidereal time). Computed from the JPL
+// approximate planetary elements for 2013-11-05 09:08 UTC:
+//   Sun : RA 220.5 deg, Dec -15.7 deg -> Sun in the south-west at
+//         Sriharikota, about 40 deg high (afternoon)
+//   Mars: RA 164.1 deg, Dec  +8.5 deg, 1.89 AU from Earth (in Leo, a
+//         morning planet, below the horizon at launch time)
+const float SUN_LATITUDE = -15.72f;
+const float SUN_LONGITUDE = 38.71f;
+const float MARS_LATITUDE = 8.51f;
+const float MARS_LONGITUDE = -17.69f;
+
+// Mars and the Sun are drawn in the correct directions but far closer
+// than real (true distances would be ~1e6 Earth radii). Sizes: Mars has
+// its real size relative to Earth (0.53 R_earth); the Sun is shrunk to a
+// small disc.
+const float MARS_DISTANCE = 800.0f;
+const float MARS_RADIUS = 0.532f * EARTH_RADIUS;
+const float SUN_DISTANCE = 1500.0f;
+const float SUN_RADIUS = 20.0f;
+const float MARS_ROTATION_DEG_PER_S = 360.0f / 88643.0f; // sidereal sol
 
 const float EARTH_ROTATION_DEG_PER_S = 360.0f / 86164.0f; // sidereal day
 
@@ -76,7 +93,7 @@ struct OrbitCamera
 
 // 0 = Earth view (world units), 1 = launch site, 2 = vehicle (model units)
 OrbitCamera cameras[3] = {
-    {0.0f, 0.0f, 90.0f, 33.0f, 400.0f, -89.0f},
+    {0.0f, 0.0f, 90.0f, 33.0f, 650.0f, -89.0f},
     {-150.0f, 8.0f, 32.0f, 8.0f, 2000.0f, 2.0f}, // sunlit (south-west) side
     {-150.0f, 10.0f, 22.0f, 5.0f, 300.0f, -80.0f},
 };
@@ -297,6 +314,10 @@ int main() {
         auto earthMesh = make_unique<Mesh>(earthVertices, earthIndices);
         auto stars = make_unique<Starfield>(4000, 100.0f);
 
+        // Unit sphere shared by Mars and the Sun.
+        generateSphere(1.0f, 64, 128);
+        auto unitSphere = make_unique<Mesh>(earthVertices, earthIndices);
+
         Cylinder cylinder(64, false);
         Cylinder cone(64, true);
         Cube cube;
@@ -322,6 +343,8 @@ int main() {
 
         GLuint earthTex = loadTexture("textures/earth.jpg", false);
         if (!earthTex) throw runtime_error("Cannot load texture: textures/earth.jpg");
+        GLuint marsTex = loadTexture("textures/Mars.jpg", false);
+        if (!marsTex) throw runtime_error("Cannot load texture: textures/Mars.jpg");
         GLuint groundTex = loadTexture("textures/ground.jpg", true);
         if (!groundTex) cerr << "Note: textures/ground.jpg not found, using a plain ground colour.\n";
 
@@ -457,6 +480,40 @@ int main() {
             glUniform1f(glGetUniformLocation(starProgram, "starVisibility"), 1.0f - skyAmount);
             stars->draw();
             glEnable(GL_DEPTH_TEST);
+
+            // ---------------- Sun and Mars ----------------
+            // Drawn as a background layer with their own near/far range,
+            // then the depth buffer is cleared, so the close-up cameras
+            // (very small near plane) keep good depth precision for Earth
+            // and the vehicle. Earth drawn afterwards still hides them.
+            {
+                glm::mat4 farProjection = glm::perspective(glm::radians(45.0f), (float)width / height, 1.0f, 5000.0f);
+
+                // Sun: self-lit disc in the light direction.
+                glm::mat4 sunModel = glm::translate(glm::mat4(1.0f), sunDir * SUN_DISTANCE);
+                sunModel = glm::scale(sunModel, glm::vec3(SUN_RADIUS));
+                setMatrices(rocketProgram, sunModel, view, farProjection);
+                glUniform3f(glGetUniformLocation(rocketProgram, "objectColor"), 1.0f, 0.93f, 0.75f);
+                glUniform1f(glGetUniformLocation(rocketProgram, "emissive"), 1.0f);
+                unitSphere->draw();
+                glUniform1f(glGetUniformLocation(rocketProgram, "emissive"), 0.0f);
+
+                // Mars: textured, lit by the Sun, slowly rotating.
+                glm::vec3 marsDir = surfaceDirection(MARS_LATITUDE, MARS_LONGITUDE);
+                float marsRot = MARS_ROTATION_DEG_PER_S * static_cast<float>(flight.missionTime);
+                glm::mat4 marsModel = glm::translate(glm::mat4(1.0f), marsDir * MARS_DISTANCE);
+                marsModel = glm::rotate(marsModel, glm::radians(marsRot), glm::vec3(0, 1, 0));
+                marsModel = glm::scale(marsModel, glm::vec3(MARS_RADIUS));
+                setMatrices(earthProgram, marsModel, view, farProjection);
+                glUniform3fv(glGetUniformLocation(earthProgram, "lightPos"), 1, glm::value_ptr(lightPos));
+                glUniform1i(glGetUniformLocation(earthProgram, "earthTexture"), 0);
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, marsTex);
+                unitSphere->draw();
+                glBindTexture(GL_TEXTURE_2D, 0);
+
+                glClear(GL_DEPTH_BUFFER_BIT);
+            }
 
             // ---------------- Atmosphere ----------------
             glDepthMask(GL_FALSE);
@@ -679,7 +736,9 @@ int main() {
         stars.reset();
         glDeleteBuffers(1, &trailVBO);
         glDeleteVertexArrays(1, &trailVAO);
+        unitSphere.reset();
         glDeleteTextures(1, &earthTex);
+        glDeleteTextures(1, &marsTex);
         if (groundTex) glDeleteTextures(1, &groundTex);
         glDeleteProgram(earthProgram);
         glDeleteProgram(atmosphereProgram);
