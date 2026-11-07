@@ -152,11 +152,12 @@ int main(int argc, char** argv)
                           {TRAJ_STAGE3, "PS3", {8}, 4}};
     for (const Part& part : parts)
     {
+        // The path starts exactly at the separation (on the vehicle).
         double t0 = events[part.event];
-        s.clear();
+        s.assign(1, {t0, vehicleCurve(t0)});
         for (const Record& r : rec)
         {
-            if (r.t < t0 - 1e-6 || r.t > t0 + DEBRIS_WINDOW_S + 1e-6) continue;
+            if (r.t <= t0 + 1e-6 || r.t > t0 + DEBRIS_WINDOW_S + 1e-6) continue;
             glm::dvec3 off(0.0);
             for (int i : part.debris) off += r.offsets[i];
             s.push_back({r.t, vehicleCurve(r.t) + off / double(part.debris.size())});
@@ -165,9 +166,9 @@ int main(int argc, char** argv)
         start[part.id] = s.front().t;
         length[part.id] = s.back().t - s.front().t;
     }
-    s.clear();
+    s.assign(1, {events[5], vehicleCurve(events[5])});
     for (const Record& r : rec)
-        if (r.t >= events[5] - 1e-6) s.push_back({r.t, vehicleCurve(r.t) + r.payloadOffset});
+        if (r.t > events[5] + 1e-6) s.push_back({r.t, vehicleCurve(r.t) + r.payloadOffset});
     traj[TRAJ_PAYLOAD] = fitPath("Mangalyaan", s, 0.1 * ROCKET_SCALE);
     start[TRAJ_PAYLOAD] = s.front().t;
     length[TRAJ_PAYLOAD] = tEnd - s.front().t;
