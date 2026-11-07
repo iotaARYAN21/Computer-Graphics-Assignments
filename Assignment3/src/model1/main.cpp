@@ -160,8 +160,7 @@ void drawCube(Cube& cube, GLuint program, const glm::mat4& view,
     setMatrices(program, model, view, projection);
 
     glUniform3f(glGetUniformLocation(program, "lightPos"), 4.0f, 8.0f, 5.0f);
-    glUniform3fv(glGetUniformLocation(program, "objectColor"), 1,
-                 glm::value_ptr(color));
+    glUniform3fv(glGetUniformLocation(program, "objectColor"), 1, glm::value_ptr(color));
     cube.draw();
 }
 
@@ -180,7 +179,6 @@ void drawBeam(
 
     if (length < 0.0001f)
         return;
-
     glm::vec3 midpoint = (start + end) * 0.5f;
 
     // Rotate the cube's Y-axis to point along the beam.
@@ -193,7 +191,7 @@ void drawBeam(
     model *= glm::mat4_cast(rotation);
 
     // Cube is centred at the origin and has actual dimensions 1x1x1
-    // (from -0.5 to 0.5 in each dimension), so we scale by full length.
+    // from -0.5 to 0.5 in each dimension
     model = glm::scale(
         model,
         glm::vec3(thickness, length, thickness));
@@ -201,11 +199,9 @@ void drawBeam(
     glUseProgram(program);
     setMatrices(program, model, view, projection);
     glUniform3f(
-        glGetUniformLocation(program, "lightPos"),
-        4.0f, 8.0f, 5.0f);
+        glGetUniformLocation(program, "lightPos"), 4.0f, 8.0f, 5.0f);
     glUniform3fv(
-        glGetUniformLocation(program, "objectColor"),
-        1, glm::value_ptr(color));
+        glGetUniformLocation(program, "objectColor"), 1, glm::value_ptr(color));
     cube.draw();
 }
 
@@ -262,7 +258,7 @@ int main()
         glfwTerminate();
         return -1;
     }
-    // GLEW can leave an OpenGL error behind when initialized in a core context.
+    // leave an OpenGL error behind when initialized in a core context.
     glGetError();
 
     glEnable(GL_DEPTH_TEST);
@@ -328,6 +324,7 @@ int main()
                      glm::vec3(0.0f, 0.18f, 0.0f),
                      glm::vec3(6.0f, 0.36f, 5.0f),
                      glm::vec3(0.48f, 0.49f, 0.52f));
+
             // Raised central launch pedestal.
             drawCube(cube, cubeProgram, view, projection,
                      glm::vec3(0.0f, 0.52f, 0.0f),
@@ -336,7 +333,6 @@ int main()
 
               
             // Simplified launch-site towers
-              
             const glm::vec3 towerColor(1.0f, 0.65f, 0.0f);
             glm::vec3 towerPositions[] = {
                 glm::vec3(-4.5f, 2.0f, -3.5f),
@@ -357,9 +353,7 @@ int main()
                 );
             }
 
-              
             // Service tower - structurally aligned frame
-              
             glm::vec3 steelColor(0.65f, 0.68f, 0.72f);
             // Position and dimensions
             float towerX = -4.2f;
