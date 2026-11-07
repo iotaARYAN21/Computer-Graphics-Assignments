@@ -417,43 +417,40 @@ void drawRocket(Cylinder &cylinder,
                     localSize * satelliteScale, color);
         };
 
-        // Main satellite body.
-        drawSatelliteBox(glm::vec3(0.0f), glm::vec3(0.85f, 0.65f, 0.65f),
-                         glm::vec3(0.82f, 0.62f, 0.22f));
+        //   Main satellite body.
+        drawSatelliteBox(glm::vec3(0.0f), glm::vec3(0.85f, 0.65f,0.65f),
+                         glm::vec3(0.82f, 0.62f,0.22f));
 
         // Dark panel mounting sections.
         for (int side : {-1, 1})
-        {
-            drawSatelliteBox(glm::vec3(0.0f, 0.0f, side * 0.55f),
-                             glm::vec3(0.16f, 0.12f, 0.35f),
-                             glm::vec3(0.35f, 0.35f, 0.38f));
+        {   drawSatelliteBox(glm::vec3(0.0f, 0.0f, side * 0.55f),
+                             glm::vec3( 0.16f, 0.12f, 0.35f),
+                             glm::vec3( 0.35f, 0.35f, 0.38f));
         }
-
-        // Solar panels and their grid lines.
+ 
+        // Solar panels with grid lines.
         const glm::vec3 panelColor(0.035f, 0.12f, 0.34f);
         const glm::vec3 gridColor(0.32f, 0.55f, 0.78f);
-
         for (int side : {-1, 1})
-        {
+        { 
             glm::vec3 panelCenter(0.0f, 0.0f, side * 1.45f);
             drawSatelliteBox(panelCenter, glm::vec3(0.95f, 0.055f, 1.45f), panelColor);
 
             for (int i = -2; i <= 2; ++i)
-            {
+            { 
                 float x = i * 0.16f;
-                drawSatelliteBox(panelCenter + glm::vec3(x, 0.032f, 0.0f),
-                                 glm::vec3(0.012f, 0.012f, 1.40f), gridColor);
+                drawSatelliteBox( panelCenter + glm::vec3(x, 0.032f, 0.0f),
+                                 glm::vec3( 0.012f, 0.012f, 1.40f), gridColor);
             }
-
-            for (int i = -3; i <= 3; ++i)
+            for (int i = -3; i <=3; ++i)
             {
-                float z = i * 0.19f;
-                drawSatelliteBox(panelCenter + glm::vec3(0.0f, 0.033f, z),
-                                 glm::vec3(0.92f, 0.012f, 0.012f), gridColor);
+                float z = i* 0.19f;
+                drawSatelliteBox(panelCenter + glm::vec3(0.0f,  0.033f, z),
+                                 glm::vec3( 0.92f, 0.012f, 0.012f), gridColor);
             }
         }
 
-        // Antenna mast and dish. Scale their positions and dimensions too.
+        //Antenna mast and dish. Scale their positions and dimensions too. 
         drawCylinder(
             cylinder, program, view, projection,
             spacecraftCenter + glm::vec3(0.0f, 0.48f * satelliteScale, 0.0f),
