@@ -214,7 +214,7 @@ void drawRocket(Cylinder &cylinder,
         cube.draw();
     };
 
-    // ================= ROCKET STAGES =================
+    //       ROCKET STAGES      
     // Press S to start a simple sequential stage-separation animation.
     // Each spent lower stage moves downward and fades out of the scene
     // conceptually by moving well below the visible rocket.
@@ -286,7 +286,7 @@ void drawRocket(Cylinder &cylinder,
                      glm::vec3(0.62f, 0.28f, 0.62f), gold);
     }
 
-    // ================= PAYLOAD FAIRING SEPARATION =================
+    //       PAYLOAD FAIRING SEPARATION      
     float fairingProgress = 0.0f;
     if (fairingSeparationStarted)
     {
@@ -323,7 +323,7 @@ void drawRocket(Cylinder &cylinder,
     glUniform3f(glGetUniformLocation(program, "objectColor"), 0.88f, 0.88f, 0.84f);
     fairingHalfB.draw();
 
-    // ================= BOOSTER SEPARATION =================
+    //       BOOSTER SEPARATION      
 
     // Calculate how far the animation has progressed.
     // Separation takes 2 seconds.
@@ -385,7 +385,7 @@ void drawRocket(Cylinder &cylinder,
             orange);
     }
 
-    // ================= MANGALYAAN SPACECRAFT =================
+    //       MANGALYAAN SPACECRAFT      
     // Before F: hidden inside the closed fairing.
     // After F: visible but still attached to the upper stage.
     // Press D: deploy it away from the rocket and expand it to full size.

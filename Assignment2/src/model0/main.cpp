@@ -193,9 +193,9 @@ void generateSphere(float radius, int stacks, int sectors)
     }
 }
 
-// Camera position in world space. Earth is a unit sphere at the origin.
-// The camera always looks along -Z and is moved by pure translation:
-// arrow keys move it along X and Y, [ and ] move it along Z.
+// camera position in world space. Earth is a unit sphere at the origin
+// the camera always looks along -Z and is moved by pure translation
+// arrow keys move it along X and Y, [ and ] move it along Z
 glm::vec3 cameraPos(0.0f, 0.0f, 4.0f);
 
 const float MIN_CAMERA_RADIUS = 1.015f; // just above the surface
@@ -208,7 +208,7 @@ void processInput(GLFWwindow* window, float deltaTime, float& earthRotation)
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
-    // Move slower near the surface so close-up views are easy to control.
+    // move slower near the surface so close-up views are easy to control
     float altitude = glm::length(cameraPos) - 1.0f;
     float moveSpeed = 1.5f * glm::max(altitude, 0.02f) * deltaTime;
 
@@ -225,14 +225,14 @@ void processInput(GLFWwindow* window, float deltaTime, float& earthRotation)
     if (glfwGetKey(window, GLFW_KEY_RIGHT_BRACKET) == GLFW_PRESS)
         cameraPos.z += moveSpeed;
 
-    // Keep the camera outside Earth and within a useful range.
+    // keep the camera outside Earth and within a useful range
     float radius = glm::length(cameraPos);
     if (radius < MIN_CAMERA_RADIUS)
         cameraPos *= MIN_CAMERA_RADIUS / radius;
     else if (radius > MAX_CAMERA_RADIUS)
         cameraPos *= MAX_CAMERA_RADIUS / radius;
 
-    // Rotate Earth about its own (Y) axis. glfwGetKey works on physical
+    // rotate Earth about its own (Y) axis. glfwGetKey works on physical
     // keys, so both 'a'/'A' and 'd'/'D' are handled.
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
         earthRotation -= rotationSpeed;

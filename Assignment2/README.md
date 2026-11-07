@@ -201,4 +201,3 @@ src/model3/       a2-scene (main.cpp + Flight.cpp flight model)
 - [GLM](https://github.com/g-truc/glm), [GLFW](https://www.glfw.org/),
   [GLEW](https://glew.sourceforge.net/).
 
-

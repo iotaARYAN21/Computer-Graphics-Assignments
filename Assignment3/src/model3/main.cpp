@@ -32,9 +32,9 @@ const int WINDOW_WIDTH = 1200;
 const int WINDOW_HEIGHT = 900;
 const float PI = 3.14159265359f;
 
-// ---------------------------------------------------------------------------
+//       
 // Cameras
-// ---------------------------------------------------------------------------
+//       
 struct OrbitCamera
 {
     float yaw, pitch, distance, minDistance, maxDistance, minPitch;
@@ -52,9 +52,9 @@ OrbitCamera cameras[CAMERA_COUNT] = {
 const char* CAMERA_NAMES[CAMERA_COUNT] = {"Earth view", "Launch site", "Vehicle", "Planets (Earth + Mars)"};
 int cameraMode = 1;
 
-// ---------------------------------------------------------------------------
+//       
 // Keyframe animation (trajectory.txt + keyframes.txt)
-// ---------------------------------------------------------------------------
+//       
 const int FRAMES_PER_INTERVAL = 60; // fixed number of frames per keyframe interval
 vector<ControlPoints> trajectories;
 vector<Keyframe> keyframes;
@@ -456,11 +456,35 @@ int main() {
             const glm::vec3 localSatPos(0.0f, 8.75f, 0.0f);
             glm::vec3 worldSatPos = glm::vec3(satelliteBase * glm::vec4(localSatPos, 1.0f));
 
+            // After the launch, Mangalyaan follows one curve per mission phase,
+            // pointing along its direction of travel and drawn larger.
+            int spacePath = -1;
+            for (int id : {TRAJ_ORBIT_RAISING, TRAJ_CRUISE, TRAJ_MARS_ORBIT})
+                if (animationReady && st.active[id]) spacePath = id;
+            bool vehicleVisible = !animationReady || st.active[TRAJ_VEHICLE];
+            if (spacePath >= 0) {
+                const ControlPoints& c = trajectories[spacePath];
+                float u = st.u[spacePath];
+                glm::vec3 pos = evaluateBezier(c, u);
+                glm::vec3 axis = glm::normalize(evaluateBezier(c, glm::min(u + 0.002f, 1.0f)) - evaluateBezier(c, glm::max(u - 0.002f, 0.0f)));
+                glm::vec3 x = glm::normalize(glm::cross(axis, glm::vec3(0.0f, 1.0f, 0.0f)));
+                satelliteBase = glm::translate(glm::mat4(1.0f), pos) * glm::mat4(glm::mat3(x, axis, glm::cross(x, axis)))
+                              * glm::scale(glm::mat4(1.0f), glm::vec3(ROCKET_SCALE * PAYLOAD_SPACE_SCALE))
+                              * glm::translate(glm::mat4(1.0f), -localSatPos);
+                worldSatPos = pos;
+                payloadSeparated = true;
+            }
+
             // ---------------- Cameras ----------------
             OrbitCamera& cam = cameras[cameraMode];
             float cy = glm::radians(cam.yaw);
             float cp = glm::radians(cam.pitch);
             glm::vec3 orbit(cos(cp) * sin(cy), sin(cp), cos(cp) * cos(cy));
+
+            // Active keyframed camera: an eye trajectory followed by its target.
+            int keyCameraEye = -1;
+            for (int id : {TRAJ_CAMERA_EYE, TRAJ_EYE_ORBIT, TRAJ_EYE_CRUISE, TRAJ_EYE_MARS})
+                if (animationReady && st.active[id] && st.active[id + 1]) keyCameraEye = id;
 
             glm::mat4 view;
             glm::vec3 cameraPos;
@@ -479,11 +503,14 @@ int main() {
                 view = editor.viewMatrix();
                 nearPlane = editor.nearPlane();
                 farPlane = 6000.0f;
-            } else if (!userCamera && animationReady && st.active[TRAJ_CAMERA_EYE] && st.active[TRAJ_CAMERA_TARGET]) {
+            } else if (!userCamera && keyCameraEye >= 0) {
                 // Keyframed camera: eye and look-at target follow their own curves.
-                cameraPos = evaluateBezier(trajectories[TRAJ_CAMERA_EYE], st.u[TRAJ_CAMERA_EYE]);
-                glm::vec3 target = evaluateBezier(trajectories[TRAJ_CAMERA_TARGET], st.u[TRAJ_CAMERA_TARGET]);
-                view = glm::lookAt(cameraPos, target, glm::normalize(target));
+                cameraPos = evaluateBezier(trajectories[keyCameraEye], st.u[keyCameraEye]);
+                glm::vec3 target = evaluateBezier(trajectories[keyCameraEye + 1], st.u[keyCameraEye + 1]);
+                glm::vec3 up = keyCameraEye == TRAJ_CAMERA_EYE ? glm::normalize(target) : glm::vec3(0.0f, 1.0f, 0.0f);
+                if (fabs(glm::dot(glm::normalize(target - cameraPos), up)) > 0.95f) up = glm::vec3(1.0f, 0.0f, 0.0f);
+                view = glm::lookAt(cameraPos, target, up);
+                if (keyCameraEye != TRAJ_CAMERA_EYE) nearPlane = 0.05f;
             } else if (cameraMode == 0) {
                 // Earth view: distant camera around Earth's centre.
                 cameraPos = orbit * cam.distance;
@@ -510,6 +537,14 @@ int main() {
                 // Vehicle camera: moves with the launch vehicle (then the payload).
                 glm::vec3 target = payloadSeparated ? worldSatPos : rocketCentre;
                 float d = cam.distance * ROCKET_SCALE;
+                if (spacePath >= 0) {
+                    // Mangalyaan is drawn larger after the launch: orbit it instead.
+                    d *= 0.25f * PAYLOAD_SPACE_SCALE;
+                    rocketRight = glm::normalize(glm::vec3(satelliteBase[0]));
+                    rocketUp = glm::normalize(glm::vec3(satelliteBase[1]));
+                    rocketForward = glm::normalize(glm::vec3(satelliteBase[2]));
+                    nearPlane = 0.05f;
+                }
                 glm::vec3 offset = rocketRight * (d * orbit.x) + rocketUp * (d * orbit.y) + rocketForward * (d * orbit.z);
                 cameraPos = target + offset;
                 view = glm::lookAt(cameraPos, target, rocketUp);
@@ -567,11 +602,15 @@ int main() {
                 unitSphere->draw();
                 glUniform1f(glGetUniformLocation(rocketProgram, "emissive"), 0.0f);
 
-                // Mars: textured, lit by the Sun, slowly rotating.
+                // Mars: textured, lit by the Sun. When the camera is close to
+                // Mars it is drawn with the normal depth range instead, so
+                // the spacecraft can pass behind it.
                 glm::vec3 marsDir = surfaceDirection(MARS_LATITUDE, MARS_LONGITUDE);
+                bool marsNear = glm::length(cameraPos - marsDir * MARS_DISTANCE) < 300.0f;
+                if (marsNear) glClear(GL_DEPTH_BUFFER_BIT);
                 glm::mat4 marsModel = glm::translate(glm::mat4(1.0f), marsDir * MARS_DISTANCE);
                 marsModel = glm::scale(marsModel, glm::vec3(MARS_RADIUS));
-                setMatrices(earthProgram, marsModel, view, farProjection);
+                setMatrices(earthProgram, marsModel, view, marsNear ? projection : farProjection);
                 glUniform3fv(glGetUniformLocation(earthProgram, "lightPos"), 1, glm::value_ptr(lightPos));
                 glUniform1i(glGetUniformLocation(earthProgram, "earthTexture"), 0);
                 glActiveTexture(GL_TEXTURE0);
@@ -579,7 +618,7 @@ int main() {
                 unitSphere->draw();
                 glBindTexture(GL_TEXTURE_2D, 0);
 
-                glClear(GL_DEPTH_BUFFER_BIT);
+                if (!marsNear) glClear(GL_DEPTH_BUFFER_BIT);
             }
 
             // ---------------- Atmosphere ----------------
@@ -657,19 +696,21 @@ int main() {
             const glm::vec3 fairingScale(1.22f, 1.55f, 1.22f);
             const glm::vec3 fairingBasePos(0.0f, 9.05f, 0.0f);
 
-            if (stage == STAGE_ON_PAD)
-                for (int i = 0; i < 4; ++i) drawBooster(rocketTransform, i, glm::mat4(1.0f));
-            if (stage <= STAGE_NO_BOOSTERS) drawStage1(rocketTransform);
-            if (stage <= STAGE_NO_FAIRING) drawStage2(rocketTransform);
-            if (stage <= STAGE_NO_PS2) drawStage3(rocketTransform);
+            if (vehicleVisible) {
+                if (stage == STAGE_ON_PAD)
+                    for (int i = 0; i < 4; ++i) drawBooster(rocketTransform, i, glm::mat4(1.0f));
+                if (stage <= STAGE_NO_BOOSTERS) drawStage1(rocketTransform);
+                if (stage <= STAGE_NO_FAIRING) drawStage2(rocketTransform);
+                if (stage <= STAGE_NO_PS2) drawStage3(rocketTransform);
 
-            // PS4 and payload adapter stay with the vehicle.
-            drawComponent(cylinder, rocketTransform, glm::vec3(0.0f, 7.78f, 0.0f), glm::vec3(0.72f, 0.55f, 0.72f), dark);
-            drawComponent(cylinder, rocketTransform, glm::vec3(0.0f, 8.18f, 0.0f), glm::vec3(0.62f, 0.28f, 0.62f), gold);
+                // PS4 and payload adapter stay with the vehicle.
+                drawComponent(cylinder, rocketTransform, glm::vec3(0.0f, 7.78f, 0.0f), glm::vec3(0.72f, 0.55f, 0.72f), dark);
+                drawComponent(cylinder, rocketTransform, glm::vec3(0.0f, 8.18f, 0.0f), glm::vec3(0.62f, 0.28f, 0.62f), gold);
 
-            if (stage <= STAGE_NO_PS1) {
-                drawComponent(fairingA, rocketTransform, fairingBasePos, fairingScale, white);
-                drawComponent(fairingB, rocketTransform, fairingBasePos, fairingScale, white);
+                if (stage <= STAGE_NO_PS1) {
+                    drawComponent(fairingA, rocketTransform, fairingBasePos, fairingScale, white);
+                    drawComponent(fairingB, rocketTransform, fairingBasePos, fairingScale, white);
+                }
             }
 
             // ---------------- Separated parts (each on its own curve) ----------------
@@ -731,22 +772,28 @@ int main() {
                 float flicker = 1.0f + 0.06f * sin(40.0f * t) + 0.04f * sin(97.0f * t);
                 glm::mat4 flip = glm::rotate(glm::mat4(1.0f), PI, glm::vec3(1, 0, 0));
 
+                glm::mat4 plumeBase = rocketTransform;
                 auto drawPlume = [&](const glm::vec3& nozzle, float diameter, float length) {
                     float w = diameter * expansion;
                     float l = length * flicker * (1.0f + 0.4f * (expansion - 1.0f));
                     glUniform1f(glGetUniformLocation(rocketProgram, "alpha"), 0.55f);
-                    drawComponent(cone, rocketTransform, nozzle - glm::vec3(0.0f, 0.5f * l, 0.0f), glm::vec3(w, l, w), glm::vec3(1.0f, 0.45f, 0.12f), flip);
+                    drawComponent(cone, plumeBase, nozzle - glm::vec3(0.0f, 0.5f * l, 0.0f), glm::vec3(w, l, w), glm::vec3(1.0f, 0.45f, 0.12f), flip);
                     glUniform1f(glGetUniformLocation(rocketProgram, "alpha"), 0.8f);
-                    drawComponent(cone, rocketTransform, nozzle - glm::vec3(0.0f, 0.3f * l, 0.0f), glm::vec3(0.55f * w, 0.6f * l, 0.55f * w), glm::vec3(1.0f, 0.85f, 0.55f), flip);
+                    drawComponent(cone, plumeBase, nozzle - glm::vec3(0.0f, 0.3f * l, 0.0f), glm::vec3(0.55f * w, 0.6f * l, 0.55f * w), glm::vec3(1.0f, 0.85f, 0.55f), flip);
                 };
 
-                if (stage == STAGE_ON_PAD) {
+                if (spacePath >= 0) {
+                    // Mangalyaan's own engine (orbit-raising, TMI and MOI burns).
+                    plumeBase = satelliteBase;
+                    drawPlume(localSatPos - glm::vec3(0.0f, 0.35f, 0.0f), 0.25f, 0.8f);
+                } else if (stage == STAGE_ON_PAD) {
                     for (int i = 0; i < 4; ++i) {
                         float a = glm::radians(45.0f + 90.0f * i);
                         drawPlume(glm::vec3(0.92f * cos(a), 0.3f, 0.92f * sin(a)), 0.3f, 2.5f);
                     }
                 }
-                if (stage <= STAGE_NO_BOOSTERS) drawPlume(glm::vec3(0.0f), 1.0f, 4.0f);
+                if (spacePath >= 0) {}
+                else if (stage <= STAGE_NO_BOOSTERS) drawPlume(glm::vec3(0.0f), 1.0f, 4.0f);
                 else if (stage <= STAGE_NO_FAIRING) drawPlume(glm::vec3(0.0f, 3.65f, 0.0f), 0.8f, 3.0f);
                 else if (stage == STAGE_NO_PS2) drawPlume(glm::vec3(0.0f, 5.78f, 0.0f), 0.6f, 2.5f);
                 else drawPlume(glm::vec3(0.0f, 7.5f, 0.0f), 0.4f, 1.5f);
@@ -757,11 +804,13 @@ int main() {
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
             }
 
-            // ---------------- Flight path so far (manual Earth view) ----------------
-            if (userCamera && cameraMode == 0 && animationReady && st.active[TRAJ_VEHICLE]) {
+            // ---------------- Path so far: vehicle (manual Earth view) or Mangalyaan ----------------
+            int trailPath = spacePath >= 0 ? spacePath
+                          : (userCamera && cameraMode == 0 && animationReady && st.active[TRAJ_VEHICLE]) ? TRAJ_VEHICLE : -1;
+            if (trailPath >= 0) {
                 vector<glm::vec3> points;
-                for (int i = 0; i <= 100; ++i)
-                    points.push_back(evaluateBezier(trajectories[TRAJ_VEHICLE], st.u[TRAJ_VEHICLE] * i / 100.0f));
+                for (int i = 0; i <= 1000; ++i)
+                    points.push_back(evaluateBezier(trajectories[trailPath], st.u[trailPath] * i / 1000.0f));
                 glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
                 glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(glm::vec3), points.data(), GL_DYNAMIC_DRAW);
                 setMatrices(rocketProgram, glm::mat4(1.0f), view, projection);
@@ -839,11 +888,16 @@ int main() {
                              editor.current.size(), editor.focus.x, editor.focus.y, editor.focus.z,
                              editor.distance, editor.status.c_str());
                 } else {
+                    char alt[32] = "";
+                    if (spacePath < 0) snprintf(alt, sizeof(alt), " | alt %.1f km", altitude);
                     snprintf(title, sizeof(title),
-                             "a3-scene | %s | frame %d (keyframe %d of %zu) | alt %.1f km | %s | camera: %s",
+                             "a3-scene | %s | frame %d (keyframe %d of %zu)%s | %s | camera: %s",
                              playing ? "PLAYING" : (animationReady ? "press P to play" : "no keyframes"),
-                             frame, frame / FRAMES_PER_INTERVAL + 1, keyframes.size(), altitude,
-                             stageName(stage, engineOn), userCamera ? CAMERA_NAMES[cameraMode] : "keyframed");
+                             frame, frame / FRAMES_PER_INTERVAL + 1, keyframes.size(), alt,
+                             spacePath == TRAJ_ORBIT_RAISING ? (engineOn ? "Earth orbit raising: perigee burn" : "Earth orbit raising")
+                             : spacePath == TRAJ_CRUISE ? (engineOn ? (st.u[TRAJ_CRUISE] < 0.5f ? "Trans-Mars Injection burn" : "Mars Orbit Insertion burn") : "cruise to Mars")
+                             : spacePath == TRAJ_MARS_ORBIT ? "in Mars orbit" : stageName(stage, engineOn),
+                             userCamera ? CAMERA_NAMES[cameraMode] : "keyframed");
                 }
                 glfwSetWindowTitle(window, title);
             }

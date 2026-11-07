@@ -19,7 +19,6 @@ std::vector<glm::vec3> sampleBezier(const ControlPoints& points, int samples);
 // trajectory.txt format (one block per trajectory):
 //   number_of_control_points
 //   x_1 y_1 z_1
-//   ...
 //   x_n y_n z_n
 // Further trajectories are appended as more blocks of the same form.
 bool appendTrajectory(const std::string& path, const ControlPoints& points);
