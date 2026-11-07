@@ -508,6 +508,7 @@ int main() {
                 cameraPos = evaluateBezier(trajectories[keyCameraEye], st.u[keyCameraEye]);
                 glm::vec3 target = evaluateBezier(trajectories[keyCameraEye + 1], st.u[keyCameraEye + 1]);
                 glm::vec3 up = keyCameraEye == TRAJ_CAMERA_EYE ? glm::normalize(target) : glm::vec3(0.0f, 1.0f, 0.0f);
+                if (fabs(glm::dot(glm::normalize(target - cameraPos), up)) > 0.95f) up = glm::vec3(1.0f, 0.0f, 0.0f);
                 view = glm::lookAt(cameraPos, target, up);
                 if (keyCameraEye != TRAJ_CAMERA_EYE) nearPlane = 0.05f;
             } else if (cameraMode == 0) {
@@ -536,6 +537,14 @@ int main() {
                 // Vehicle camera: moves with the launch vehicle (then the payload).
                 glm::vec3 target = payloadSeparated ? worldSatPos : rocketCentre;
                 float d = cam.distance * ROCKET_SCALE;
+                if (spacePath >= 0) {
+                    // Mangalyaan is drawn larger after the launch: orbit it instead.
+                    d *= 0.25f * PAYLOAD_SPACE_SCALE;
+                    rocketRight = glm::normalize(glm::vec3(satelliteBase[0]));
+                    rocketUp = glm::normalize(glm::vec3(satelliteBase[1]));
+                    rocketForward = glm::normalize(glm::vec3(satelliteBase[2]));
+                    nearPlane = 0.05f;
+                }
                 glm::vec3 offset = rocketRight * (d * orbit.x) + rocketUp * (d * orbit.y) + rocketForward * (d * orbit.z);
                 cameraPos = target + offset;
                 view = glm::lookAt(cameraPos, target, rocketUp);

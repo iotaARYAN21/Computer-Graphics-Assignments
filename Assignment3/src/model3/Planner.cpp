@@ -244,15 +244,17 @@ int main(int argc, char** argv)
         for (const glm::vec3& p : c) out.push_back(glm::vec3(glm::dvec3(p) * scale + offset));
         return out;
     };
-    // Orbit raising: look down on the midpoint between Earth and Mangalyaan.
-    traj[TRAJ_TARGET_ORBIT] = mapped(traj[TRAJ_ORBIT_RAISING], 0.5, glm::dvec3(0.0));
-    traj[TRAJ_EYE_ORBIT] = mapped(traj[TRAJ_ORBIT_RAISING], 0.5, orbitNormal * 170.0);
-    // Cruise: follow from behind, looking ahead towards Mars.
+    // All three look at Mangalyaan from a few units away.
+    // Orbit raising: slightly further from Earth than the spacecraft (curve
+    // scaled by 1.06 about Earth's centre), so Earth is seen behind it.
+    traj[TRAJ_TARGET_ORBIT] = traj[TRAJ_ORBIT_RAISING];
+    traj[TRAJ_EYE_ORBIT] = mapped(traj[TRAJ_ORBIT_RAISING], 1.06, orbitNormal * 2.0);
+    // Cruise: just behind, looking ahead towards Mars.
     traj[TRAJ_TARGET_CRUISE] = traj[TRAJ_CRUISE];
-    traj[TRAJ_EYE_CRUISE] = mapped(traj[TRAJ_CRUISE], 1.0, -approach * 25.0 + orbitNormal * 8.0);
-    // Mars orbit: look down on the midpoint between Mars and Mangalyaan.
-    traj[TRAJ_TARGET_MARS] = mapped(traj[TRAJ_MARS_ORBIT], 0.5, mars * 0.5);
-    traj[TRAJ_EYE_MARS] = mapped(traj[TRAJ_MARS_ORBIT], 0.5, mars * 0.5 + marsNormal * 140.0);
+    traj[TRAJ_EYE_CRUISE] = mapped(traj[TRAJ_CRUISE], 1.0, -approach * 6.0 + orbitNormal * 2.0);
+    // Mars orbit: scaled by 1.08 about Mars' centre, so Mars is seen behind it.
+    traj[TRAJ_TARGET_MARS] = traj[TRAJ_MARS_ORBIT];
+    traj[TRAJ_EYE_MARS] = mapped(traj[TRAJ_MARS_ORBIT], 1.08, mars * (1.0 - 1.08) + marsNormal * 2.0);
 
     for (const ControlPoints& c : traj) appendTrajectory("trajectory.txt", c);
 
@@ -291,14 +293,15 @@ int main(int argc, char** argv)
     // Keyframes after the launch: positions on each phase's curve, and the
     // intervals with a burn (engine = 1): the two perigee burns, Trans-Mars
     // Injection at the start of the cruise and Mars Orbit Insertion at its end.
-    struct Section { int path, eye, target; vector<float> u; vector<int> burn; };
+    // Evenly spaced keyframes (n per phase) so each orbit takes ~12 s.
+    struct Section { int path, eye, target, n; vector<int> burnAt; };
     vector<Section> sections = {
-        {TRAJ_ORBIT_RAISING, TRAJ_EYE_ORBIT, TRAJ_TARGET_ORBIT, {0, .04f, .25f, .46f, .5f, .54f, .75f, .96f}, {1, 0, 0, 0, 1, 0, 0, 0}},
-        {TRAJ_CRUISE, TRAJ_EYE_CRUISE, TRAJ_TARGET_CRUISE, {0, .05f, .3f, .55f, .8f, .95f}, {1, 0, 0, 0, 0, 1}},
-        {TRAJ_MARS_ORBIT, TRAJ_EYE_MARS, TRAJ_TARGET_MARS, {0, .25f, .5f, .75f, 1}, {0, 0, 0, 0, 0}}};
+        {TRAJ_ORBIT_RAISING, TRAJ_EYE_ORBIT, TRAJ_TARGET_ORBIT, 24, {0, 12}}, // perigee burns
+        {TRAJ_CRUISE, TRAJ_EYE_CRUISE, TRAJ_TARGET_CRUISE, 12, {0, 11}},      // TMI, MOI
+        {TRAJ_MARS_ORBIT, TRAJ_EYE_MARS, TRAJ_TARGET_MARS, 12, {}}};
     Keyframe base = keys.back();
     for (size_t sec = 0; sec < sections.size(); ++sec)
-        for (size_t j = 0; j < sections[sec].u.size(); ++j)
+        for (int j = 0; j < sections[sec].n + (sec + 1 == sections.size() ? 1 : 0); ++j)
         {
             Keyframe key = base;
             for (int i = 0; i < TRAJ_COUNT; ++i) key.active[i] = 0;
@@ -307,9 +310,10 @@ int main(int argc, char** argv)
             for (int id : {sections[sec].path, sections[sec].eye, sections[sec].target})
             {
                 key.active[id] = 1;
-                key.u[id] = sections[sec].u[j];
+                key.u[id] = float(j) / sections[sec].n;
             }
-            key.extra[FIELD_ENGINE] = float(sections[sec].burn[j]);
+            const vector<int>& b = sections[sec].burnAt;
+            key.extra[FIELD_ENGINE] = float(find(b.begin(), b.end(), j) != b.end());
             keys.push_back(key);
         }
     saveKeyframes("keyframes.txt", keys,

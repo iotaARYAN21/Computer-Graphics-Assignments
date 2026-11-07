@@ -286,12 +286,12 @@ are not to scale; Mars stays where it was on launch day):
 3. **Mars orbit:** one elliptical orbit around Mars.
 
 Mangalyaan is drawn 150× larger in these phases so it stays visible, and
-its path so far is drawn as a line. Each phase has its own camera
-eye/target pair:
-- orbit raising: looking down on the point midway between Earth and
-  Mangalyaan;
-- cruise: following from behind, with Mars ahead;
-- Mars orbit: looking down on the point midway between Mars and Mangalyaan.
+its path so far is drawn as a line. Each orbit takes about 12 seconds on
+screen. Each phase has its own camera eye/target pair, a few units from
+Mangalyaan:
+- orbit raising: just outside the spacecraft's orbit, with Earth behind it;
+- cruise: just behind it, with Mars ahead;
+- Mars orbit: just outside its orbit, with Mars behind it.
 
 These camera curves are the payload curve's control points scaled or
 shifted, and scaling or moving a Bézier curve's control points scales or
