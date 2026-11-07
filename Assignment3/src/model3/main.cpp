@@ -809,8 +809,8 @@ int main() {
                           : (userCamera && cameraMode == 0 && animationReady && st.active[TRAJ_VEHICLE]) ? TRAJ_VEHICLE : -1;
             if (trailPath >= 0) {
                 vector<glm::vec3> points;
-                for (int i = 0; i <= 200; ++i)
-                    points.push_back(evaluateBezier(trajectories[trailPath], st.u[trailPath] * i / 200.0f));
+                for (int i = 0; i <= 1000; ++i)
+                    points.push_back(evaluateBezier(trajectories[trailPath], st.u[trailPath] * i / 1000.0f));
                 glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
                 glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(glm::vec3), points.data(), GL_DYNAMIC_DRAW);
                 setMatrices(rocketProgram, glm::mat4(1.0f), view, projection);

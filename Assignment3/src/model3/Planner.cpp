@@ -311,6 +311,7 @@ int main(int argc, char** argv)
             {
                 key.active[id] = 1;
                 key.u[id] = float(j) / sections[sec].n;
+                if (sec + 1 == sections.size()) key.u[id] *= 0.9f; // stop before the Mars orbit closes on itself
             }
             const vector<int>& b = sections[sec].burnAt;
             key.extra[FIELD_ENGINE] = float(find(b.begin(), b.end(), j) != b.end());

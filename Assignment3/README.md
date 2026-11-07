@@ -283,7 +283,8 @@ are not to scale; Mars stays where it was on launch day):
    perigee stays low, with a burn at each perigee.
 2. **Cruise:** a cubic Bézier from the last perigee (Trans-Mars Injection
    burn) to a point beside Mars (Mars Orbit Insertion burn).
-3. **Mars orbit:** one elliptical orbit around Mars.
+3. **Mars orbit:** most of one elliptical orbit around Mars (the animation
+   stops just before the orbit closes).
 
 Mangalyaan is drawn 150× larger in these phases so it stays visible, and
 its path so far is drawn as a line. Each orbit takes about 12 seconds on
