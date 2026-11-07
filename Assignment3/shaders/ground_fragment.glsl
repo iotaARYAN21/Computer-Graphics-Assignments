@@ -5,10 +5,9 @@ in vec3 Normal;
 in vec2 TexCoord;
 
 out vec4 FragColor;
-
 uniform vec3 lightPos = vec3(4.0, 8.0, 5.0);
 
-// Ground texture (textures/groundTexture.jpg). If it could not be loaded the
+// Ground texture (groundTexture.jpg). If it could not be loaded the
 // program leaves useTexture = false and a plain colour is used instead.
 uniform sampler2D groundTexture;
 uniform bool useTexture = false;

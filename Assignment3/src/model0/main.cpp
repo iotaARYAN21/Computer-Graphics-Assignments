@@ -324,7 +324,6 @@ int main()
             lastFrame = currentFrame;
 
             processInput(window, deltaTime, earthRotation);
-
             int width = 0, height = 0;
             glfwGetFramebufferSize(window, &width, &height);
             if (height == 0) height = 1;
@@ -333,7 +332,7 @@ int main()
             glClearColor(0.0f, 0.0f, 0.02f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            // Fixed viewing direction (-Z); only the position changes.
+            // Fixed viewing direction (-Z).
             const glm::mat4 view = glm::lookAt(
                 cameraPos,
                 cameraPos + glm::vec3(0.0f, 0.0f, -1.0f),
@@ -355,7 +354,7 @@ int main()
             stars->draw();
             glEnable(GL_DEPTH_TEST);
 
-            // Atmosphere first.
+            // Atmosphere around earth.
             glm::mat4 atmosphereModel = glm::scale(
                 earthModel, glm::vec3(1.04f));
             setMatrixUniforms(atmosphereProgram, atmosphereModel, view, projection);
@@ -377,14 +376,12 @@ int main()
             glfwPollEvents();
         }
 
-        // Ensure Mesh is destroyed while the OpenGL context still exists.
+        // This ensure tat only Mesh is destroyed not the OpenGL context.
         earthMesh.reset();
         stars.reset();
     }
     catch (const exception& e)
-    {
-        cerr << "Error: " << e.what() << '\n';
-    }
+        {   cerr << "Error: " << e.what() << '\n'; }
 
     if (earthTexture) glDeleteTextures(1, &earthTexture);
     if (earthProgram) glDeleteProgram(earthProgram);

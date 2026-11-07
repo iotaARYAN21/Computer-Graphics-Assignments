@@ -5,7 +5,6 @@ in vec3 Normal;
 in vec3 WorldPos;
 
 out vec4 FragColor;
-
 uniform vec3 cameraPos;
 
 void main()
@@ -15,12 +14,11 @@ void main()
 
     float facing = max(dot(N, V), 0.0);
 
-    // Atmospheric glow concentrated at Earth's silhouette
+    // Atmospheric glow concentrated at the Earth's silhouette
     float rim = 1.0 - facing;
     float glow = pow(rim, 5.0);
 
     vec3 atmosphereColor = vec3(0.18, 0.48, 1.0);
-
     float alpha = glow * 0.22;
 
     if (alpha < 0.005)
