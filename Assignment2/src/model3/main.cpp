@@ -348,8 +348,8 @@ int main() {
         if (!earthTex) throw runtime_error("Cannot load texture: textures/earth.jpg");
         GLuint marsTex = loadTexture("textures/Mars.jpg", false);
         if (!marsTex) throw runtime_error("Cannot load texture: textures/Mars.jpg");
-        GLuint groundTex = loadTexture("textures/ground.jpg", true);
-        if (!groundTex) cerr << "Note: textures/ground.jpg not found, using a plain ground colour.\n";
+        GLuint groundTex = loadTexture("textures/groundTexture.jpg", true);
+        if (!groundTex) cerr << "Note: textures/groundTexture.jpg not found, using a plain ground colour.\n";
 
         resetMission();
 
@@ -553,7 +553,7 @@ int main() {
                 glUniform3fv(glGetUniformLocation(groundProgram, "lightPos"), 1, glm::value_ptr(lightPos));
                 glUniform1i(glGetUniformLocation(groundProgram, "useTexture"), groundTex != 0);
                 glUniform1i(glGetUniformLocation(groundProgram, "groundTexture"), 0);
-                glUniform1f(glGetUniformLocation(groundProgram, "uvRepeat"), 20.0f);
+                glUniform1f(glGetUniformLocation(groundProgram, "uvRepeat"), 1.0f);
                 glBindTexture(GL_TEXTURE_2D, groundTex);
                 ground.draw();
             }

@@ -277,7 +277,7 @@ int main()
 
         Cube cube;
         Plane ground;
-        GLuint groundTexture = loadTexture("textures/ground.jpg");
+        GLuint groundTexture = loadTexture("textures/groundTexture.jpg");
 
         cout << "Controls:\n"
              << "  Arrow keys: orbit camera\n"

@@ -44,7 +44,7 @@ cd Assignment2
 ./build/a2-scene
 ```
 
-`textures/ground.jpg` is used as the launch-site ground texture. If it is
+`textures/groundTexture.jpg` is used as the launch-site ground texture. If it is
 missing, a plain green ground is drawn and a note is printed.
 
 ## Executables and controls
@@ -179,7 +179,7 @@ and `src/common/`.
 ```
 CMakeLists.txt
 shaders/          GLSL shaders (Earth, atmosphere, ground, rocket/cube, stars)
-textures/         earth.jpg, Mars.jpg, ground.jpg
+textures/         earth.jpg, Mars.jpg, groundTexture.jpg
 src/common/       Mesh, Starfield
 src/models/       Cube, Plane, Cylinder (also cone), Fairing
 src/model0/       a2-model-0
@@ -194,7 +194,7 @@ src/model3/       a2-scene (main.cpp + Flight.cpp flight model)
 - Earth texture: `textures/earth.jpg` (equirectangular Earth image; add
   its source here).
 - Mars texture: `textures/Mars.jpg` (add its source here).
-- Ground texture: `textures/ground.jpg` (add its source here).
+- Ground texture: `textures/groundTexture.jpg` (add its source here).
 - E. M. Standish, *Keplerian Elements for Approximate Positions of the
   Major Planets* (JPL), used for the Sun and Mars directions at launch.
 - [stb_image](https://github.com/nothings/stb) by Sean Barrett (public domain / MIT).
