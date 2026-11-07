@@ -101,8 +101,8 @@ GLuint createProgram(const string& vertexPath, const string& fragmentPath)
     return program;
 }
 
-// Loads a repeating texture. Returns 0 (and prints a note) if the file is
-// missing, so the program can still run with a plain colour.
+// Loads a repeating texture. Returns 0 (and prints a note) if the file is missing
+// So the program can still run with a plain colour.
 GLuint loadTexture(const char* path)
 {
     int width = 0, height = 0, channels = 0;
