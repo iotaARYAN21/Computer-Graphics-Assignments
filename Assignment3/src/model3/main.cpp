@@ -12,7 +12,8 @@
 #include "../models/Cube.h"
 #include "../models/Fairing.h"
 #include "../models/Plane.h"
-#include "Flight.h"
+#include "Keyframes.h"
+#include "SceneConfig.h"
 #include "TrajectoryEditor.h"
 
 #include <cmath>
@@ -30,59 +31,6 @@ using namespace std;
 const int WINDOW_WIDTH = 1200;
 const int WINDOW_HEIGHT = 900;
 const float PI = 3.14159265359f;
-
-// ---------------------------------------------------------------------------
-// Scene scale
-// ---------------------------------------------------------------------------
-// Earth is drawn with radius 30. At true scale the 44 m tall PSLV would be
-// invisible, so the vehicle (and everything near it) is drawn about 140x
-// larger than real. The trajectory itself uses real kilometres from the
-// flight model, so the vehicle still climbs several of its own heights
-// before the first separation.
-const float EARTH_RADIUS = 30.0f;
-const float KM_TO_WORLD = EARTH_RADIUS / static_cast<float>(EARTH_RADIUS_KM);
-const float ROCKET_SCALE = 0.003f;               // model units -> world units
-const float MODEL_UNITS_PER_METRE = 9.83f / 44.4f; // model height / real height
-const float PAD_TOP = 0.41f;                     // pad height in model units
-
-// Separated parts are drawn relative to the vehicle with the same
-// magnification as the vehicle, so separations look right next to it.
-const float SEPARATION_TO_WORLD = 1000.0f * MODEL_UNITS_PER_METRE * ROCKET_SCALE;
-const float DEBRIS_HIDE_DISTANCE = 150.0f; // model units
-
-// ---------------------------------------------------------------------------
-// Mission data: PSLV-C25 / Mars Orbiter Mission (Mangalyaan)
-// Launch: 5 November 2013, 09:08 UTC (14:38 IST), First Launch Pad,
-// Satish Dhawan Space Centre, Sriharikota.
-// ---------------------------------------------------------------------------
-const float SITE_LATITUDE = 13.72f;
-const float SITE_LONGITUDE = 80.23f;
-const double LAUNCH_AZIMUTH = 104.0; // degrees from north, over the Bay of Bengal
-
-// Directions of the Sun and Mars at launch time, written as the point on
-// Earth where each one is overhead (latitude = declination, longitude =
-// right ascension - Greenwich sidereal time). Computed from the JPL
-// approximate planetary elements for 2013-11-05 09:08 UTC:
-//   Sun : RA 220.5 deg, Dec -15.7 deg -> Sun in the south-west at
-//         Sriharikota, about 40 deg high (afternoon)
-//   Mars: RA 164.1 deg, Dec  +8.5 deg, 1.89 AU from Earth (in Leo, a
-//         morning planet, below the horizon at launch time)
-const float SUN_LATITUDE = -15.72f;
-const float SUN_LONGITUDE = 38.71f;
-const float MARS_LATITUDE = 8.51f;
-const float MARS_LONGITUDE = -17.69f;
-
-// Mars and the Sun are drawn in the correct directions but far closer
-// than real (true distances would be ~1e6 Earth radii). Sizes: Mars has
-// its real size relative to Earth (0.53 R_earth); the Sun is shrunk to a
-// small disc.
-const float MARS_DISTANCE = 800.0f;
-const float MARS_RADIUS = 0.532f * EARTH_RADIUS;
-const float SUN_DISTANCE = 1500.0f;
-const float SUN_RADIUS = 20.0f;
-const float MARS_ROTATION_DEG_PER_S = 360.0f / 88643.0f; // sidereal sol
-
-const float EARTH_ROTATION_DEG_PER_S = 360.0f / 86164.0f; // sidereal day
 
 // ---------------------------------------------------------------------------
 // Cameras
@@ -104,11 +52,50 @@ OrbitCamera cameras[CAMERA_COUNT] = {
 const char* CAMERA_NAMES[CAMERA_COUNT] = {"Earth view", "Launch site", "Vehicle", "Planets (Earth + Mars)"};
 int cameraMode = 1;
 
-const int WARP_LEVELS[] = {1, 2, 5, 10, 20, 50};
-const int WARP_COUNT = 6;
-int warpIndex = 3; // 10x
+// ---------------------------------------------------------------------------
+// Keyframe animation (trajectory.txt + keyframes.txt)
+// ---------------------------------------------------------------------------
+const int FRAMES_PER_INTERVAL = 60; // fixed number of frames per keyframe interval
+vector<ControlPoints> trajectories;
+vector<Keyframe> keyframes;
+vector<float> separationTilt(TRAJ_COUNT, 0.0f); // vehicle tilt when each part separated
+bool animationReady = false;
+bool playing = false;
+int frame = 0;
+bool userCamera = false; // C switches from the keyframed camera to the manual ones
 
-Flight flight;
+void loadAnimation() {
+    trajectories = loadTrajectories("trajectory.txt");
+    keyframes = loadKeyframes("keyframes.txt", TRAJ_COUNT, FIELD_COUNT);
+    animationReady = trajectories.size() >= TRAJ_COUNT && !keyframes.empty();
+    if (!animationReady) {
+        cout << "Animation needs " << TRAJ_COUNT << " trajectories in trajectory.txt and keyframes.txt "
+             << "(found " << trajectories.size() << " and " << keyframes.size() << "). Run ./build/a3-plan.\n";
+        return;
+    }
+    for (int id = 0; id < TRAJ_COUNT; ++id)
+        for (const Keyframe& k : keyframes)
+            if (k.active[id]) { separationTilt[id] = k.extra[FIELD_TILT]; break; }
+    cout << "Loaded " << trajectories.size() << " trajectories and " << keyframes.size() << " keyframes.\n";
+}
+
+// Vehicle axes at a position: long axis tilted from the local vertical by
+// tiltDeg, inside the flight plane of the launch.
+glm::mat3 frameAt(const glm::vec3& pos, float tiltDeg) {
+    static const glm::vec3 planeNormal = [] {
+        glm::vec3 up = surfaceDirection(SITE_LATITUDE, SITE_LONGITUDE);
+        glm::vec3 east = glm::normalize(glm::cross(glm::vec3(0, 1, 0), up));
+        glm::vec3 north = glm::cross(up, east);
+        float az = glm::radians(float(LAUNCH_AZIMUTH));
+        return glm::normalize(glm::cross(up, cos(az) * north + sin(az) * east));
+    }();
+    glm::vec3 up = glm::normalize(pos);
+    glm::vec3 forward = glm::normalize(glm::cross(planeNormal, up));
+    float t = glm::radians(tiltDeg);
+    glm::vec3 axis = cos(t) * up + sin(t) * forward;
+    glm::vec3 x = glm::normalize(planeNormal - glm::dot(planeNormal, axis) * axis);
+    return glm::mat3(x, axis, glm::cross(x, axis));
+}
 
 // Bezier trajectory editor (E toggles it) and queued mouse clicks.
 TrajectoryEditor editor;
@@ -127,11 +114,6 @@ void mouseButtonCallback(GLFWwindow*, int button, int action, int) {
     if (action != GLFW_PRESS || !editor.active) return;
     pendingClicks.push_back({cursorX, cursorY, button});
 }
-
-// Flight path drawn as a line in the Earth view (positions in the
-// Earth-fixed frame, world units).
-vector<glm::vec3> trail;
-double lastTrailTime = -1.0;
 
 vector<float> earthVertices;
 vector<unsigned int> earthIndices;
@@ -229,15 +211,6 @@ void setMatrices(GLuint program, const glm::mat4& model, const glm::mat4& view, 
     glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 }
 
-// Unit vector from Earth's centre to a latitude/longitude, matching the
-// texture mapping of generateSphere(): u = 1 - phi / 2pi and the
-// equirectangular texture has longitude -180 at u = 0, so phi = 180 - lon.
-glm::vec3 surfaceDirection(float lat, float lon) {
-    float latRad = glm::radians(lat);
-    float phi = glm::radians(180.0f - lon);
-    return glm::vec3(cos(latRad) * cos(phi), sin(latRad), cos(latRad) * sin(phi));
-}
-
 // Local frame on the surface: x = east, y = up, z = north.
 glm::mat4 getSurfaceTransform(float lat, float lon, float radius) {
     glm::vec3 up = surfaceDirection(lat, lon);
@@ -258,10 +231,8 @@ float smoothStep(float edge0, float edge1, float x) {
 }
 
 void resetMission() {
-    flight.reset(glm::dvec3(surfaceDirection(SITE_LATITUDE, SITE_LONGITUDE)), LAUNCH_AZIMUTH);
-    trail.clear();
-    lastTrailTime = -1.0;
-
+    playing = false;
+    frame = 0;
     // Point the Earth-view camera at India.
     glm::vec3 d = surfaceDirection(SITE_LATITUDE, SITE_LONGITUDE);
     cameras[0].pitch = glm::degrees(asin(d.y)) + 10.0f;
@@ -312,23 +283,25 @@ void processInput(GLFWwindow* window, float deltaTime) {
     if (pressed(GLFW_KEY_Y)) editor.loadAll();
     if (pressed(GLFW_KEY_H)) editor.showLoaded = !editor.showLoaded;
 
-    if (!editor.active && pressed(GLFW_KEY_C)) cameraMode = (cameraMode + 1) % CAMERA_COUNT;
-    if (pressed(GLFW_KEY_L)) flight.launch();
+    if (!editor.active && pressed(GLFW_KEY_C)) {
+        if (userCamera) cameraMode = (cameraMode + 1) % CAMERA_COUNT;
+        userCamera = true;
+    }
+    if (pressed(GLFW_KEY_P)) { // start the animation from the first keyframe
+        loadAnimation();
+        resetMission();
+        playing = animationReady;
+        userCamera = false;
+    }
+    if (pressed(GLFW_KEY_SPACE) && animationReady) playing = !playing;
     if (pressed(GLFW_KEY_R)) resetMission();
-    if (pressed(GLFW_KEY_EQUAL) || pressed(GLFW_KEY_KP_ADD)) warpIndex = glm::min(warpIndex + 1, WARP_COUNT - 1);
-    if (pressed(GLFW_KEY_MINUS) || pressed(GLFW_KEY_KP_SUBTRACT)) warpIndex = glm::max(warpIndex - 1, 0);
 }
 
-const char* phaseName() {
-    if (!flight.launched) return "on pad";
-    switch (flight.phase) {
-        case PHASE_PS1_STRAPONS: return "PS1 + strap-ons";
-        case PHASE_PS1: return "PS1";
-        case PHASE_PS2: return "PS2";
-        case PHASE_PS3: return "PS3";
-        case PHASE_PS4: return "PS4";
-        default: return flight.satelliteReleased ? "Mangalyaan released" : "coast";
-    }
+const char* stageName(int stage, bool engineOn) {
+    const char* names[] = {"PS1 + strap-ons", "PS1", "PS2", "PS2", "PS3", "PS4", "Mangalyaan separated"};
+    if (stage == STAGE_ON_PAD && !engineOn) return "on pad";
+    if (!engineOn && stage < STAGE_PAYLOAD_SEPARATED) return "coast";
+    return names[glm::clamp(stage, 0, 6)];
 }
 
 int main() {
@@ -393,17 +366,16 @@ int main() {
         GLuint groundTex = loadTexture("textures/groundTexture.jpg", true);
         if (!groundTex) cerr << "Note: textures/groundTexture.jpg not found, using a plain ground colour.\n";
 
+        loadAnimation();
         resetMission();
 
         cout << "\n=== a3-scene: PSLV-C25 / Mangalyaan ==="
-             << "\n  L        : lift-off"
-             << "\n  C        : switch camera (Earth view / Launch site / Vehicle / Planets)"
-             << "\n  Arrows   : orbit the current camera"
-             << "\n  [ and ]  : zoom in / out"
-             << "\n  + and -  : time warp (1x to 50x)"
-             << "\n  R        : reset to the pad"
+             << "\n  P        : start the animation (reloads trajectory.txt and keyframes.txt)"
+             << "\n  Space    : pause / resume"
+             << "\n  R        : back to the first keyframe"
+             << "\n  C        : manual cameras (Earth view / Launch site / Vehicle / Planets); P returns to the keyframed camera"
+             << "\n  Arrows   : orbit the manual camera,  [ and ] : zoom"
              << "\n  Esc      : exit"
-             << "\n  Stage and fairing separations happen automatically at their altitudes."
              << "\n"
              << "\n  Trajectory editor"
              << "\n  E            : editor on / off"
@@ -429,16 +401,21 @@ int main() {
             lastFrame = currentFrame;
             processInput(window, deltaTime);
 
-            // ---------------- Simulation ----------------
-            // Briefly drop to real time after each event so separations can
-            // be seen, otherwise use the selected time warp.
-            int warp = WARP_LEVELS[warpIndex];
-            if (flight.missionTime - flight.lastEventTime < 6.0) warp = 1;
-            flight.update(deltaTime * warp);
-            for (const string& msg : flight.messages) cout << msg << endl;
-            flight.messages.clear();
-
-            float altitude = static_cast<float>(altitudeKm(flight.vehicle.pos));
+            // ---------------- Animation state ----------------
+            FrameState st;
+            if (animationReady) {
+                st = interpolateKeyframes(keyframes, frame, FRAMES_PER_INTERVAL, fieldIsDiscrete);
+                int last = totalFrames(static_cast<int>(keyframes.size()), FRAMES_PER_INTERVAL) - 1;
+                if (playing && ++frame > last) { frame = last; playing = false; }
+            }
+            auto onPath = [&](int id, glm::vec3& p) {
+                if (!animationReady || !st.active[id]) return false;
+                p = evaluateBezier(trajectories[id], st.u[id]);
+                return true;
+            };
+            int stage = animationReady ? static_cast<int>(st.extra[FIELD_STAGE] + 0.5f) : STAGE_ON_PAD;
+            bool engineOn = animationReady && st.extra[FIELD_ENGINE] > 0.5f;
+            float tilt = animationReady ? st.extra[FIELD_TILT] : 0.0f;
 
             int width, height;
             glfwGetFramebufferSize(window, &width, &height);
@@ -446,44 +423,36 @@ int main() {
             glViewport(0, 0, width, height);
 
             // ---------------- World transforms ----------------
-            // Earth turns at its real rate (times the warp) during the mission;
-            // at T+0 the Earth-fixed frame equals the world frame.
-            float earthRot = EARTH_ROTATION_DEG_PER_S * static_cast<float>(flight.missionTime);
-            glm::mat4 earthModel = glm::rotate(glm::mat4(1.0f), glm::radians(earthRot), glm::vec3(0, 1, 0));
-
-            glm::mat4 worldSiteTransform = earthModel * getSurfaceTransform(SITE_LATITUDE, SITE_LONGITUDE, EARTH_RADIUS);
+            glm::mat4 earthModel(1.0f);
+            glm::mat4 worldSiteTransform = getSurfaceTransform(SITE_LATITUDE, SITE_LONGITUDE, EARTH_RADIUS);
             glm::vec3 sitePos = glm::vec3(worldSiteTransform[3]);
             glm::vec3 siteRight = glm::vec3(worldSiteTransform[0]);
             glm::vec3 siteUp = glm::vec3(worldSiteTransform[1]);
             glm::vec3 siteForward = glm::vec3(worldSiteTransform[2]);
 
-            // Vehicle position (Earth-fixed, world units). The pad height is a
-            // constant offset so the rocket starts standing on the pad.
-            glm::vec3 siteUpFixed = surfaceDirection(SITE_LATITUDE, SITE_LONGITUDE);
-            glm::vec3 vehiclePosFixed = glm::vec3(flight.vehicle.pos) * KM_TO_WORLD + siteUpFixed * (PAD_TOP * ROCKET_SCALE);
+            // Vehicle base position (on the pad until the animation moves it).
+            glm::vec3 vehiclePos = sitePos + siteUp * (PAD_TOP * ROCKET_SCALE);
+            onPath(TRAJ_VEHICLE, vehiclePos);
+            float altitude = glm::max((glm::length(vehiclePos) - EARTH_RADIUS - PAD_TOP * ROCKET_SCALE) / KM_TO_WORLD, 0.0f);
 
-            auto placeFrame = [&](const glm::vec3& posFixed, const glm::mat3& frame) {
+            auto placeFrame = [&](const glm::vec3& pos, const glm::mat3& frame) {
                 glm::mat4 m(frame);
-                m[3] = glm::vec4(posFixed, 1.0f);
-                return earthModel * m * glm::scale(glm::mat4(1.0f), glm::vec3(ROCKET_SCALE));
-            };
-            // Separated bodies: offset from the vehicle, magnified like the vehicle.
-            auto separatedPos = [&](const Body& body) {
-                glm::vec3 offset = glm::vec3(body.pos - flight.vehicle.pos);
-                return vehiclePosFixed + offset * SEPARATION_TO_WORLD;
+                m[3] = glm::vec4(pos, 1.0f);
+                return m * glm::scale(glm::mat4(1.0f), glm::vec3(ROCKET_SCALE));
             };
 
-            glm::mat4 rocketTransform = placeFrame(vehiclePosFixed, flight.vehicleFrame());
+            glm::mat4 rocketTransform = placeFrame(vehiclePos, frameAt(vehiclePos, tilt));
             glm::vec3 rocketRight = glm::normalize(glm::vec3(rocketTransform[0]));
             glm::vec3 rocketUp = glm::normalize(glm::vec3(rocketTransform[1]));
             glm::vec3 rocketForward = glm::normalize(glm::vec3(rocketTransform[2]));
             // Middle of whatever is left of the stack, used as camera target.
-            const float STACK_CENTRE[] = {4.9f, 4.9f, 6.2f, 7.5f, 8.2f, 8.2f};
-            glm::vec3 rocketCentre = glm::vec3(rocketTransform * glm::vec4(0.0f, STACK_CENTRE[flight.phase], 0.0f, 1.0f));
+            const float STACK_CENTRE[] = {4.9f, 4.9f, 6.2f, 6.2f, 7.5f, 8.2f, 8.2f};
+            glm::vec3 rocketCentre = glm::vec3(rocketTransform * glm::vec4(0.0f, STACK_CENTRE[glm::clamp(stage, 0, 6)], 0.0f, 1.0f));
 
-            glm::mat4 satelliteBase = rocketTransform;
-            if (flight.satelliteReleased)
-                satelliteBase = placeFrame(separatedPos(flight.satellite), flight.satelliteFrame);
+            glm::vec3 payloadPos;
+            bool payloadSeparated = stage == STAGE_PAYLOAD_SEPARATED && onPath(TRAJ_PAYLOAD, payloadPos);
+            glm::mat4 satelliteBase = payloadSeparated
+                ? placeFrame(payloadPos, frameAt(payloadPos, separationTilt[TRAJ_PAYLOAD])) : rocketTransform;
             const glm::vec3 localSatPos(0.0f, 8.75f, 0.0f);
             glm::vec3 worldSatPos = glm::vec3(satelliteBase * glm::vec4(localSatPos, 1.0f));
 
@@ -510,6 +479,11 @@ int main() {
                 view = editor.viewMatrix();
                 nearPlane = editor.nearPlane();
                 farPlane = 6000.0f;
+            } else if (!userCamera && animationReady && st.active[TRAJ_CAMERA_EYE] && st.active[TRAJ_CAMERA_TARGET]) {
+                // Keyframed camera: eye and look-at target follow their own curves.
+                cameraPos = evaluateBezier(trajectories[TRAJ_CAMERA_EYE], st.u[TRAJ_CAMERA_EYE]);
+                glm::vec3 target = evaluateBezier(trajectories[TRAJ_CAMERA_TARGET], st.u[TRAJ_CAMERA_TARGET]);
+                view = glm::lookAt(cameraPos, target, glm::normalize(target));
             } else if (cameraMode == 0) {
                 // Earth view: distant camera around Earth's centre.
                 cameraPos = orbit * cam.distance;
@@ -520,7 +494,7 @@ int main() {
                 float d = cam.distance * ROCKET_SCALE;
                 glm::vec3 offset = siteRight * (d * orbit.x) + siteUp * (d * orbit.y) + siteForward * (d * orbit.z);
                 cameraPos = sitePos + offset;
-                glm::vec3 target = flight.satelliteReleased ? worldSatPos : rocketCentre;
+                glm::vec3 target = payloadSeparated ? worldSatPos : rocketCentre;
                 view = glm::lookAt(cameraPos, target, siteUp);
             } else if (cameraMode == 3) {
                 // Planets view: from just behind Earth (on the side away from
@@ -534,7 +508,7 @@ int main() {
                 nearPlane = 0.5f;
             } else {
                 // Vehicle camera: moves with the launch vehicle (then the payload).
-                glm::vec3 target = flight.satelliteReleased ? worldSatPos : rocketCentre;
+                glm::vec3 target = payloadSeparated ? worldSatPos : rocketCentre;
                 float d = cam.distance * ROCKET_SCALE;
                 glm::vec3 offset = rocketRight * (d * orbit.x) + rocketUp * (d * orbit.y) + rocketForward * (d * orbit.z);
                 cameraPos = target + offset;
@@ -595,9 +569,7 @@ int main() {
 
                 // Mars: textured, lit by the Sun, slowly rotating.
                 glm::vec3 marsDir = surfaceDirection(MARS_LATITUDE, MARS_LONGITUDE);
-                float marsRot = MARS_ROTATION_DEG_PER_S * static_cast<float>(flight.missionTime);
                 glm::mat4 marsModel = glm::translate(glm::mat4(1.0f), marsDir * MARS_DISTANCE);
-                marsModel = glm::rotate(marsModel, glm::radians(marsRot), glm::vec3(0, 1, 0));
                 marsModel = glm::scale(marsModel, glm::vec3(MARS_RADIUS));
                 setMatrices(earthProgram, marsModel, view, farProjection);
                 glUniform3fv(glGetUniformLocation(earthProgram, "lightPos"), 1, glm::value_ptr(lightPos));
@@ -685,62 +657,55 @@ int main() {
             const glm::vec3 fairingScale(1.22f, 1.55f, 1.22f);
             const glm::vec3 fairingBasePos(0.0f, 9.05f, 0.0f);
 
-            Phase phase = flight.phase;
-            if (phase == PHASE_PS1_STRAPONS)
+            if (stage == STAGE_ON_PAD)
                 for (int i = 0; i < 4; ++i) drawBooster(rocketTransform, i, glm::mat4(1.0f));
-            if (phase <= PHASE_PS1) drawStage1(rocketTransform);
-            if (phase <= PHASE_PS2) drawStage2(rocketTransform);
-            if (phase <= PHASE_PS3) drawStage3(rocketTransform);
+            if (stage <= STAGE_NO_BOOSTERS) drawStage1(rocketTransform);
+            if (stage <= STAGE_NO_FAIRING) drawStage2(rocketTransform);
+            if (stage <= STAGE_NO_PS2) drawStage3(rocketTransform);
 
             // PS4 and payload adapter stay with the vehicle.
             drawComponent(cylinder, rocketTransform, glm::vec3(0.0f, 7.78f, 0.0f), glm::vec3(0.72f, 0.55f, 0.72f), dark);
             drawComponent(cylinder, rocketTransform, glm::vec3(0.0f, 8.18f, 0.0f), glm::vec3(0.62f, 0.28f, 0.62f), gold);
 
-            if (!flight.fairingSeparated) {
+            if (stage <= STAGE_NO_PS1) {
                 drawComponent(fairingA, rocketTransform, fairingBasePos, fairingScale, white);
                 drawComponent(fairingB, rocketTransform, fairingBasePos, fairingScale, white);
             }
 
-            // ---------------- Separated parts ----------------
-            for (const Debris& d : flight.debris) {
-                if (!d.active) continue;
-                glm::vec3 posFixed = separatedPos(d.body);
-                if (glm::length(posFixed - vehiclePosFixed) > DEBRIS_HIDE_DISTANCE * ROCKET_SCALE) continue;
-
-                glm::mat4 base = placeFrame(posFixed, d.frame);
-                float t = static_cast<float>(flight.missionTime - d.releaseTime);
-
-                switch (d.kind) {
-                    case DEBRIS_BOOSTER: {
-                        float a = glm::radians(45.0f + 90.0f * d.index);
-                        glm::vec3 outDir(cos(a), 0.0f, sin(a));
-                        glm::mat4 rot = glm::rotate(glm::mat4(1.0f), glm::radians(12.0f * t), glm::cross(glm::vec3(0, 1, 0), outDir));
-                        drawBooster(base, d.index, rot);
-                        break;
-                    }
-                    case DEBRIS_STAGE1: drawStage1(base); break;
-                    case DEBRIS_STAGE2: drawStage2(base); break;
-                    case DEBRIS_STAGE3: drawStage3(base); break;
-                    case DEBRIS_FAIRING_A:
-                    case DEBRIS_FAIRING_B: {
-                        // Each half swings open about its base and drifts away.
-                        float sign = (d.kind == DEBRIS_FAIRING_A) ? 1.0f : -1.0f;
-                        glm::mat4 rot = glm::rotate(glm::mat4(1.0f), glm::radians(sign * 25.0f * t), glm::vec3(1, 0, 0));
-                        glm::mat4 hinge = glm::translate(base, fairingBasePos - glm::vec3(0.0f, 0.5f * fairingScale.y, 0.0f));
-                        hinge *= rot;
-                        glm::vec3 up(0.0f, 0.5f * fairingScale.y, 0.0f);
-                        if (d.kind == DEBRIS_FAIRING_A) drawComponent(fairingA, hinge, up, fairingScale, white);
-                        else drawComponent(fairingB, hinge, up, fairingScale, white);
-                        break;
-                    }
+            // ---------------- Separated parts (each on its own curve) ----------------
+            // They keep the attitude they had at separation and tumble slowly.
+            // Boosters and fairing halves also drift sideways from their group path
+            // (spring push of 12 m/s and 6 m/s, drawn at the vehicle's scale).
+            glm::vec3 p;
+            auto partBase = [&](int id) { return placeFrame(p, frameAt(p, separationTilt[id])); };
+            if (onPath(TRAJ_BOOSTERS, p)) {
+                float u = st.u[TRAJ_BOOSTERS];
+                float spread = 12.0f * DEBRIS_WINDOW_S * u * MODEL_UNITS_PER_METRE;
+                for (int i = 0; i < 4; ++i) {
+                    float a = glm::radians(45.0f + 90.0f * i);
+                    glm::vec3 outDir(cos(a), 0.0f, sin(a));
+                    glm::mat4 rot = glm::rotate(glm::mat4(1.0f), glm::radians(70.0f * u), glm::cross(glm::vec3(0, 1, 0), outDir));
+                    drawBooster(glm::translate(partBase(TRAJ_BOOSTERS), outDir * spread), i, rot);
+                }
+            }
+            if (onPath(TRAJ_STAGE1, p)) drawStage1(glm::rotate(partBase(TRAJ_STAGE1), glm::radians(25.0f * st.u[TRAJ_STAGE1]), glm::vec3(1, 0, 0)));
+            if (onPath(TRAJ_STAGE2, p)) drawStage2(glm::rotate(partBase(TRAJ_STAGE2), glm::radians(25.0f * st.u[TRAJ_STAGE2]), glm::vec3(1, 0, 0)));
+            if (onPath(TRAJ_STAGE3, p)) drawStage3(glm::rotate(partBase(TRAJ_STAGE3), glm::radians(25.0f * st.u[TRAJ_STAGE3]), glm::vec3(1, 0, 0)));
+            if (onPath(TRAJ_FAIRING, p)) {
+                // Each half swings open about its base while drifting sideways.
+                float u = st.u[TRAJ_FAIRING];
+                for (float sign : {1.0f, -1.0f}) {
+                    glm::mat4 hinge = glm::translate(partBase(TRAJ_FAIRING),
+                        fairingBasePos + glm::vec3(0.0f, -0.5f * fairingScale.y, sign * 6.0f * DEBRIS_WINDOW_S * u * MODEL_UNITS_PER_METRE));
+                    hinge = glm::rotate(hinge, glm::radians(sign * 120.0f * u), glm::vec3(1, 0, 0));
+                    drawComponent(sign > 0 ? fairingA : fairingB, hinge, glm::vec3(0.0f, 0.5f * fairingScale.y, 0.0f), fairingScale, white);
                 }
             }
 
             // ---------------- Mangalyaan ----------------
-            if (flight.fairingSeparated) {
-                float dProg = 0.0f;
-                if (flight.satelliteReleased)
-                    dProg = glm::clamp(static_cast<float>(flight.missionTime - flight.satelliteReleaseTime) / 3.0f, 0.0f, 1.0f);
+            if (stage >= STAGE_NO_FAIRING) {
+                // Unfolds during the first part of its own path.
+                float dProg = payloadSeparated ? glm::clamp(st.u[TRAJ_PAYLOAD] * 8.0f, 0.0f, 1.0f) : 0.0f;
                 float dSmooth = dProg * dProg * (3.0f - 2.0f * dProg);
 
                 float satScale = 0.35f + (0.65f * dSmooth);
@@ -755,7 +720,7 @@ int main() {
             // ---------------- Exhaust ----------------
             // Self-lit, additive cones under each burning engine. The plume
             // widens with altitude as the outside air pressure drops.
-            if (flight.launched && phase != PHASE_COAST) {
+            if (engineOn) {
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE);
                 glDepthMask(GL_FALSE);
                 glUseProgram(rocketProgram);
@@ -775,16 +740,16 @@ int main() {
                     drawComponent(cone, rocketTransform, nozzle - glm::vec3(0.0f, 0.3f * l, 0.0f), glm::vec3(0.55f * w, 0.6f * l, 0.55f * w), glm::vec3(1.0f, 0.85f, 0.55f), flip);
                 };
 
-                if (phase == PHASE_PS1_STRAPONS) {
+                if (stage == STAGE_ON_PAD) {
                     for (int i = 0; i < 4; ++i) {
                         float a = glm::radians(45.0f + 90.0f * i);
                         drawPlume(glm::vec3(0.92f * cos(a), 0.3f, 0.92f * sin(a)), 0.3f, 2.5f);
                     }
                 }
-                if (phase <= PHASE_PS1) drawPlume(glm::vec3(0.0f), 1.0f, 4.0f);
-                else if (phase == PHASE_PS2) drawPlume(glm::vec3(0.0f, 3.65f, 0.0f), 0.8f, 3.0f);
-                else if (phase == PHASE_PS3) drawPlume(glm::vec3(0.0f, 5.78f, 0.0f), 0.6f, 2.5f);
-                else if (phase == PHASE_PS4) drawPlume(glm::vec3(0.0f, 7.5f, 0.0f), 0.4f, 1.5f);
+                if (stage <= STAGE_NO_BOOSTERS) drawPlume(glm::vec3(0.0f), 1.0f, 4.0f);
+                else if (stage <= STAGE_NO_FAIRING) drawPlume(glm::vec3(0.0f, 3.65f, 0.0f), 0.8f, 3.0f);
+                else if (stage == STAGE_NO_PS2) drawPlume(glm::vec3(0.0f, 5.78f, 0.0f), 0.6f, 2.5f);
+                else drawPlume(glm::vec3(0.0f, 7.5f, 0.0f), 0.4f, 1.5f);
 
                 glUniform1f(glGetUniformLocation(rocketProgram, "emissive"), 0.0f);
                 glUniform1f(glGetUniformLocation(rocketProgram, "alpha"), 1.0f);
@@ -792,18 +757,14 @@ int main() {
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
             }
 
-            // ---------------- Flight path (Earth view) ----------------
-            if (flight.launched && flight.missionTime - lastTrailTime >= 2.0) {
-                trail.push_back(vehiclePosFixed);
-                lastTrailTime = flight.missionTime;
-            }
-            if (cameraMode == 0 && !trail.empty()) {
-                vector<glm::vec3> points = trail;
-                points.push_back(vehiclePosFixed);
+            // ---------------- Flight path so far (manual Earth view) ----------------
+            if (userCamera && cameraMode == 0 && animationReady && st.active[TRAJ_VEHICLE]) {
+                vector<glm::vec3> points;
+                for (int i = 0; i <= 100; ++i)
+                    points.push_back(evaluateBezier(trajectories[TRAJ_VEHICLE], st.u[TRAJ_VEHICLE] * i / 100.0f));
                 glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
                 glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(glm::vec3), points.data(), GL_DYNAMIC_DRAW);
-
-                setMatrices(rocketProgram, earthModel, view, projection);
+                setMatrices(rocketProgram, glm::mat4(1.0f), view, projection);
                 glUniform3f(glGetUniformLocation(rocketProgram, "objectColor"), 1.0f, 0.75f, 0.35f);
                 glUniform1f(glGetUniformLocation(rocketProgram, "emissive"), 1.0f);
                 glBindVertexArray(trailVAO);
@@ -879,9 +840,10 @@ int main() {
                              editor.distance, editor.status.c_str());
                 } else {
                     snprintf(title, sizeof(title),
-                             "a3-scene | PSLV-C25 / Mangalyaan | T+%.0f s | alt %.1f km | v %.2f km/s | %s | warp %dx | camera: %s",
-                             flight.missionTime, altitude, glm::length(flight.vehicle.vel),
-                             phaseName(), WARP_LEVELS[warpIndex], CAMERA_NAMES[cameraMode]);
+                             "a3-scene | %s | frame %d (keyframe %d of %zu) | alt %.1f km | %s | camera: %s",
+                             playing ? "PLAYING" : (animationReady ? "press P to play" : "no keyframes"),
+                             frame, frame / FRAMES_PER_INTERVAL + 1, keyframes.size(), altitude,
+                             stageName(stage, engineOn), userCamera ? CAMERA_NAMES[cameraMode] : "keyframed");
                 }
                 glfwSetWindowTitle(window, title);
             }

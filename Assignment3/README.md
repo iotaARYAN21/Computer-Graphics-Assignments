@@ -48,8 +48,9 @@ cd Assignment3
 ./build/a3-scene
 ```
 
-`trajectory.txt` is read and written in the folder the program is run
-from.
+`trajectory.txt` and `keyframes.txt` are read from (and written to) the
+folder the program is run from. They are already included; to make them
+again, run `./build/a3-plan --overwrite`.
 
 `textures/groundTexture.jpg` is used as the launch-site ground texture. If it is
 missing, a plain green ground is drawn and a note is printed.
@@ -94,73 +95,37 @@ payload fairing and the Mangalyaan spacecraft.
 | D | deploy Mangalyaan (after S) |
 | Esc | exit |
 
-### a3-scene: Integrated launch
+### a3-scene: Integrated scene and animation
 Earth, atmosphere, stars, the Sun, Mars, the launch site at Sriharikota
-and the vehicle in one scene.
+and the vehicle in one scene. The launch is played from `trajectory.txt`
+and `keyframes.txt` (see *Assignment 3* below).
 
 | Key | Action |
 |---|---|
-| L | lift-off |
-| C | cycle cameras: Launch site → Vehicle → Planets → Earth view (starts on Launch site) |
-| Arrow keys | orbit the current camera |
-| [ / ] | zoom the current camera |
-| + / − | time warp (1×, 2×, 5×, 10×, 20×, 50×) |
-| R | reset to the pad |
+| P | start the animation (reloads both files) |
+| Space | pause / resume |
+| R | back to the first keyframe |
+| C | switch to the manual cameras and cycle them: Launch site → Vehicle → Planets → Earth view. P returns to the keyframed camera |
+| Arrow keys, [ / ] | orbit and zoom the manual camera |
+| E | trajectory editor (below) |
 | Esc | exit |
 
-The window title shows mission time, altitude, speed, the current stage,
-the time warp and the active camera. Events are printed in the terminal.
-
-**Cameras**
-- *Earth view*: distant camera around Earth. In this view the flight path
-  is drawn as a thin line, so the whole launch can be followed.
+**Manual cameras**
+- *Earth view*: distant camera around Earth; the flight path so far is
+  drawn as a thin line.
 - *Launch site*: fixed near the pad, always aimed at the vehicle.
-- *Vehicle*: moves with the launch vehicle (and with Mangalyaan after
-  separation).
-- *Planets*: an extra camera, beyond the three required ones. It sits just
-  behind Earth on the side away from Mars and looks out towards Mars, so
-  Earth and Mars are both in view. Mars was about 98° away from India in
-  the sky on launch day, so no single camera can show both India and
-  Mars. That is why this view is separate.
+- *Vehicle*: moves with the launch vehicle (Mangalyaan once separated).
+- *Planets*: from behind Earth towards Mars, so both are in view (Mars was
+  about 98° away from India in the sky on launch day).
 
-**Motion.** `src/model3/Flight.cpp` integrates a point-mass model in real
-units (km, km/s) with a fixed 0.02 s step:
-- gravity `μ/r²` always acts;
-- stage thrust acts while a stage is burning, with a gravity-turn pitch
-  program;
-- aerodynamic drag (exponential atmosphere, scale height 8.5 km) acts only
-  **below 100 km**. Above that the motion is drag-free.
-
-Separated boosters, stages and fairing halves become independent bodies
-with gravity and drag only. They fall back to Earth on their own.
-
-**Event sequence** (triggered by altitude, values from the PSLV-C25 flight
-profile):
-
-| Event | Trigger | Simulated |
-|---|---|---|
-| Strap-on separation | 25 km | T+73 s |
-| PS1 separation / PS2 ignition | 58 km | T+121 s |
-| Payload fairing separation | 115 km | T+215 s |
-| PS2 separation / PS3 ignition | 135 km | T+271 s |
-| PS3 separation / PS4 ignition | 195 km | T+473 s |
-| PS4 cut-off | orbital speed reached | T+821 s, ~258 km |
-| Mangalyaan separation | 20 s after cut-off | T+841 s |
-
-After each event the simulation runs at 1× for a few seconds so the
-separation can be seen, then returns to the selected time warp.
-
-**Earth rotation and lighting.** Earth turns at the sidereal rate (scaled
-by the time warp) during the mission. The Sun is fixed in space. Its
-direction at launch time (RA 220.5°, Dec −15.7°, computed from the JPL
-approximate planetary elements) puts the Sun in the south-west at about
-40° elevation over Sriharikota, matching the 14:38 IST launch. The sky is
-blue near the sunlit ground and fades to black space with camera
+**Lighting.** The Sun direction at launch time (RA 220.5°, Dec −15.7°,
+from the JPL approximate planetary elements) puts the Sun in the
+south-west at about 40° elevation over Sriharikota, matching the 14:38 IST
+launch. The sky is blue near the sunlit ground and fades to black with
 altitude.
 
 **Celestial bodies.** Mangalyaan is a Mars mission, so the scene includes:
-- *Mars*: textured sphere, lit by the Sun and slowly rotating (one sol =
-  24.6 h). It is placed in its real direction on launch day (RA 164.1°,
+- *Mars*: textured sphere, lit by the Sun. It is placed in its real direction on launch day (RA 164.1°,
   Dec +8.5°, in Leo, 1.89 AU away), so it is a morning planet and below
   the horizon at Sriharikota during the launch.
 - *The Sun*: a self-lit disc in the same direction as the scene light,
@@ -173,7 +138,7 @@ its real size relative to Earth; the Sun is shrunk to a small disc.
 
 **Scale.** Earth has radius 30 units. At true scale the 44 m rocket would be
 invisible, so the vehicle, the launch site and the relative motion of
-separated parts are drawn about 140× larger. The trajectory itself uses
+separated parts are drawn about 140× larger. The vehicle path itself uses
 real distances.
 
 ## Assignment 3
@@ -233,6 +198,72 @@ visible from the normal cameras too; `H` hides them.
 Coordinates are world units of the scene (Earth radius 30, Earth centred at
 the origin).
 
+### Keyframe animation
+
+**Trajectories.** `trajectory.txt` holds 9 Bézier curves, in this order:
+
+| # | Object | # | Object |
+|---|---|---|---|
+| 1 | launch vehicle | 6 | PS3 |
+| 2 | strap-on boosters (all four) | 7 | Mangalyaan after separation |
+| 3 | PS1 | 8 | camera eye |
+| 4 | payload fairing (both halves) | 9 | camera look-at target |
+| 5 | PS2 | | |
+
+Each separated part's curve starts on the vehicle curve at its separation.
+Blocks added later with `T` (number 10 and up) are shown by `Y` but are not
+used by the animation.
+
+**Keyframes.** Each row of `keyframes.txt` is one keyframe:
+
+```
+active_1 u_1  active_2 u_2  ...  active_9 u_9   stage engine tilt
+```
+
+- `active_i` (0/1) shows or hides object *i*, and `u_i` is its position on
+  its curve.
+- `stage` (0–6) counts the parts dropped so far: 0 on the pad, then
+  strap-ons, PS1, fairing, PS2, PS3, Mangalyaan. Parts still attached are
+  drawn on the vehicle.
+- `engine` (0/1) shows the exhaust of the stage that is firing.
+- `tilt` is the vehicle's angle from the local vertical, in degrees. Each
+  separated part keeps the tilt it had at separation and tumbles slowly.
+
+Lines starting with `#` are comments.
+
+**Playback.** Every keyframe interval lasts a fixed 60 frames. Curve
+parameters and `tilt` are interpolated linearly. `active`, `stage` and
+`engine` keep the earlier keyframe's value and switch exactly at the next
+keyframe, so they never take fractional values. Keyframes are closer
+together around each separation, so those moments play slowly and the
+long burns play quickly. Before P is pressed, the scene shows the first
+keyframe (vehicle on the pad).
+
+**Planning the paths: `a3-plan`.** The trajectories and keyframes were
+made with `./build/a3-plan`, run in this folder. It flies the PSLV-C25
+ascent with a point-mass model (`src/model3/Flight.cpp`):
+- gravity always acts;
+- thrust and a gravity-turn pitch program act while a stage burns;
+- drag (exponential atmosphere) acts only **below 100 km**, so motion in
+  the atmosphere and in space differ.
+
+Separations are triggered at the altitudes of the PSLV-C25 flight profile.
+The planner then fits a Bézier curve to the path of every part (least
+squares with fixed end points, degree raised until the error is under
+about 1% of the rocket's height for the vehicle) and writes both files.
+It will not overwrite existing files unless run with `--overwrite`, in
+which case the old files are kept as `.bak`.
+
+| Event | Trigger | Time |
+|---|---|---|
+| Strap-on separation | 25 km | T+73 s |
+| PS1 separation / PS2 ignition | 58 km | T+121 s |
+| Payload fairing separation | 115 km | T+215 s |
+| PS2 separation / PS3 ignition | 135 km | T+271 s |
+| PS3 separation / PS4 ignition | 195 km | T+473 s |
+| PS4 cut-off | orbital speed | T+821 s, ~258 km |
+| Mangalyaan separation | 20 s after cut-off | T+841 s |
+
 ## Use of Blender
 No component was modelled in Blender. All geometry (cylinders, cones, cubes,
 fairing halves, the Earth, Mars and Sun spheres) is generated in code under `src/models/`
@@ -249,9 +280,11 @@ src/models/       Cube, Plane, Cylinder (also cone), Fairing
 src/model0/       a2-model-0
 src/model1/       a2-model-1
 src/model2/       a2-model-2
-src/model3/       a3-scene: main.cpp, Flight.cpp (flight model),
-                  Bezier.cpp (curves, trajectory.txt),
-                  TrajectoryEditor.cpp (mouse editor)
+src/model3/       a3-scene: main.cpp, Bezier.cpp (curves, trajectory.txt),
+                  Keyframes.cpp (keyframes.txt, interpolation),
+                  TrajectoryEditor.cpp (mouse editor), SceneConfig.h
+                  a3-plan: Planner.cpp, Flight.cpp (flight model)
+trajectory.txt, keyframes.txt   the animation data
 ```
 
 ## References and acknowledgements

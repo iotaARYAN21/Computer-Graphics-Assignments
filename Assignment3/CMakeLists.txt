@@ -48,8 +48,8 @@ target_link_libraries(a2-model-2 PRIVATE OpenGL::GL GLEW::GLEW glfw)
 # Executable 4: Integrated scene with trajectory editor and playback
 add_executable(a3-scene
     src/model3/main.cpp
-    src/model3/Flight.cpp
     src/model3/Bezier.cpp
+    src/model3/Keyframes.cpp
     src/model3/TrajectoryEditor.cpp
     src/common/Mesh.cpp
     src/common/Starfield.cpp
@@ -60,3 +60,13 @@ add_executable(a3-scene
 )
 target_include_directories(a3-scene PRIVATE ${CMAKE_SOURCE_DIR}/glm)
 target_link_libraries(a3-scene PRIVATE OpenGL::GL GLEW::GLEW glfw)
+
+# Executable 5: trajectory and keyframe planner (writes trajectory.txt and
+# keyframes.txt from the flight model)
+add_executable(a3-plan
+    src/model3/Planner.cpp
+    src/model3/Flight.cpp
+    src/model3/Bezier.cpp
+    src/model3/Keyframes.cpp
+)
+target_include_directories(a3-plan PRIVATE ${CMAKE_SOURCE_DIR}/glm)
