@@ -32,9 +32,9 @@ const int WINDOW_WIDTH = 1200;
 const int WINDOW_HEIGHT = 900;
 const float PI = 3.14159265359f;
 
-// ---------------------------------------------------------------------------
+//       
 // Cameras
-// ---------------------------------------------------------------------------
+//       
 struct OrbitCamera
 {
     float yaw, pitch, distance, minDistance, maxDistance, minPitch;
@@ -52,9 +52,9 @@ OrbitCamera cameras[CAMERA_COUNT] = {
 const char* CAMERA_NAMES[CAMERA_COUNT] = {"Earth view", "Launch site", "Vehicle", "Planets (Earth + Mars)"};
 int cameraMode = 1;
 
-// ---------------------------------------------------------------------------
+//       
 // Keyframe animation (trajectory.txt + keyframes.txt)
-// ---------------------------------------------------------------------------
+//       
 const int FRAMES_PER_INTERVAL = 60; // fixed number of frames per keyframe interval
 vector<ControlPoints> trajectories;
 vector<Keyframe> keyframes;

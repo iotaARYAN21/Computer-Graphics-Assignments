@@ -10,7 +10,6 @@
 #include <vector>
 
 // Interactive Bezier trajectory editor.
-//
 // The editor has its own camera that orbits a "focus point". A left click
 // places a control point where the mouse ray meets the plane through the
 // focus point facing the camera, or on Earth's surface if the surface is

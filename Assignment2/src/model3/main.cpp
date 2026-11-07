@@ -30,9 +30,9 @@ const int WINDOW_WIDTH = 1200;
 const int WINDOW_HEIGHT = 900;
 const float PI = 3.14159265359f;
 
-// ---------------------------------------------------------------------------
+//         -----------
 // Scene scale
-// ---------------------------------------------------------------------------
+//         -----------
 // Earth is drawn with radius 30. At true scale the 44 m tall PSLV would be
 // invisible, so the vehicle (and everything near it) is drawn about 140x
 // larger than real. The trajectory itself uses real kilometres from the
@@ -49,11 +49,11 @@ const float PAD_TOP = 0.41f;                     // pad height in model units
 const float SEPARATION_TO_WORLD = 1000.0f * MODEL_UNITS_PER_METRE * ROCKET_SCALE;
 const float DEBRIS_HIDE_DISTANCE = 150.0f; // model units
 
-// ---------------------------------------------------------------------------
+//         -----------
 // Mission data: PSLV-C25 / Mars Orbiter Mission (Mangalyaan)
 // Launch: 5 November 2013, 09:08 UTC (14:38 IST), First Launch Pad,
 // Satish Dhawan Space Centre, Sriharikota.
-// ---------------------------------------------------------------------------
+//         -----------
 const float SITE_LATITUDE = 13.72f;
 const float SITE_LONGITUDE = 80.23f;
 const double LAUNCH_AZIMUTH = 104.0; // degrees from north, over the Bay of Bengal
@@ -83,9 +83,9 @@ const float MARS_ROTATION_DEG_PER_S = 360.0f / 88643.0f; // sidereal sol
 
 const float EARTH_ROTATION_DEG_PER_S = 360.0f / 86164.0f; // sidereal day
 
-// ---------------------------------------------------------------------------
+//         -----------
 // Cameras
-// ---------------------------------------------------------------------------
+//         -----------
 struct OrbitCamera
 {
     float yaw, pitch, distance, minDistance, maxDistance, minPitch;
@@ -373,7 +373,7 @@ int main() {
             lastFrame = currentFrame;
             processInput(window, deltaTime);
 
-            // ---------------- Simulation ----------------
+            //    Simulation   
             // Briefly drop to real time after each event so separations can
             // be seen, otherwise use the selected time warp.
             int warp = WARP_LEVELS[warpIndex];
@@ -389,7 +389,7 @@ int main() {
             if (height == 0) height = 1;
             glViewport(0, 0, width, height);
 
-            // ---------------- World transforms ----------------
+            //    World transforms   
             // Earth turns at its real rate (times the warp) during the mission;
             // at T+0 the Earth-fixed frame equals the world frame.
             float earthRot = EARTH_ROTATION_DEG_PER_S * static_cast<float>(flight.missionTime);
@@ -431,7 +431,7 @@ int main() {
             const glm::vec3 localSatPos(0.0f, 8.75f, 0.0f);
             glm::vec3 worldSatPos = glm::vec3(satelliteBase * glm::vec4(localSatPos, 1.0f));
 
-            // ---------------- Cameras ----------------
+            //    Cameras   
             OrbitCamera& cam = cameras[cameraMode];
             float cy = glm::radians(cam.yaw);
             float cp = glm::radians(cam.pitch);
@@ -473,7 +473,7 @@ int main() {
             }
             glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)width / height, nearPlane, 2000.0f);
 
-            // ---------------- Lighting and sky ----------------
+            //    Lighting and sky   
             // The Sun is fixed in space; Earth rotates underneath it.
             glm::vec3 sunDir = surfaceDirection(SUN_LATITUDE, SUN_LONGITUDE);
             glm::vec3 lightPos = sunDir * 100000.0f;
@@ -487,14 +487,14 @@ int main() {
             glClearColor(skyColour.r, skyColour.g, skyColour.b, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            // ---------------- Stars ----------------
+            //    Stars   
             glDisable(GL_DEPTH_TEST);
             setMatrices(starProgram, glm::mat4(1.0f), view, projection);
             glUniform1f(glGetUniformLocation(starProgram, "starVisibility"), 1.0f - skyAmount);
             stars->draw();
             glEnable(GL_DEPTH_TEST);
 
-            // ---------------- Sun and Mars ----------------
+            //    Sun and Mars   
             // Drawn as a background layer with their own near/far range,
             // then the depth buffer is cleared, so the close-up cameras
             // (very small near plane) keep good depth precision for Earth
@@ -528,14 +528,14 @@ int main() {
                 glClear(GL_DEPTH_BUFFER_BIT);
             }
 
-            // ---------------- Atmosphere ----------------
+            //    Atmosphere   
             glDepthMask(GL_FALSE);
             setMatrices(atmosphereProgram, glm::scale(earthModel, glm::vec3(1.03f)), view, projection);
             glUniform3fv(glGetUniformLocation(atmosphereProgram, "cameraPos"), 1, glm::value_ptr(cameraPos));
             earthMesh->draw();
             glDepthMask(GL_TRUE);
 
-            // ---------------- Earth ----------------
+            //    Earth   
             setMatrices(earthProgram, earthModel, view, projection);
             glUniform3fv(glGetUniformLocation(earthProgram, "lightPos"), 1, glm::value_ptr(lightPos));
             glUniform1i(glGetUniformLocation(earthProgram, "earthTexture"), 0);
@@ -543,7 +543,7 @@ int main() {
             glBindTexture(GL_TEXTURE_2D, earthTex);
             earthMesh->draw();
 
-            // ---------------- Launch site ----------------
+            //    Launch site   
             glm::mat4 siteModel = worldSiteTransform * glm::scale(glm::mat4(1.0f), glm::vec3(ROCKET_SCALE));
             if (cameraMode == 1 || cameraMode == 2) {
                 // Ground patch around the pad (hidden in the distant view).
@@ -566,7 +566,7 @@ int main() {
             glUniform3f(glGetUniformLocation(rocketProgram, "objectColor"), 0.48f, 0.49f, 0.52f);
             cube.draw();
 
-            // ---------------- Vehicle ----------------
+            //    Vehicle   
             auto drawComponent = [&](auto& drawable, const glm::mat4& base, const glm::vec3& localPos, const glm::vec3& scale, const glm::vec3& color, glm::mat4 customRot = glm::mat4(1.0f)) {
                 glm::mat4 model = glm::translate(base, localPos);
                 model *= customRot;
@@ -619,7 +619,7 @@ int main() {
                 drawComponent(fairingB, rocketTransform, fairingBasePos, fairingScale, white);
             }
 
-            // ---------------- Separated parts ----------------
+            //    Separated parts   
             for (const Debris& d : flight.debris) {
                 if (!d.active) continue;
                 glm::vec3 posFixed = separatedPos(d.body);
@@ -654,7 +654,7 @@ int main() {
                 }
             }
 
-            // ---------------- Mangalyaan ----------------
+            //    Mangalyaan   
             if (flight.fairingSeparated) {
                 float dProg = 0.0f;
                 if (flight.satelliteReleased)
@@ -670,7 +670,7 @@ int main() {
                 }
             }
 
-            // ---------------- Exhaust ----------------
+            //    Exhaust   
             // Self-lit, additive cones under each burning engine. The plume
             // widens with altitude as the outside air pressure drops.
             if (flight.launched && phase != PHASE_COAST) {
@@ -710,7 +710,7 @@ int main() {
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
             }
 
-            // ---------------- Flight path (Earth view) ----------------
+            //    Flight path (Earth view)   
             if (flight.launched && flight.missionTime - lastTrailTime >= 2.0) {
                 trail.push_back(vehiclePosFixed);
                 lastTrailTime = flight.missionTime;
@@ -730,7 +730,7 @@ int main() {
                 glUniform1f(glGetUniformLocation(rocketProgram, "emissive"), 0.0f);
             }
 
-            // ---------------- Status in the title bar ----------------
+            //    Status in the title bar   
             if (currentFrame - lastTitleUpdate > 0.2) {
                 lastTitleUpdate = currentFrame;
                 char title[256];

@@ -1,11 +1,4 @@
-// a3-plan: writes trajectory.txt and keyframes.txt for the launch.
-//
-// It flies the ascent with the flight model, fits a Bezier curve to the
-// path of every part (least squares, end points fixed) and samples the
-// keyframes. a3-scene then animates from these two files only.
-//
-// Usage: a3-plan [--overwrite]   (run in the Assignment3 folder)
-// Existing files are only replaced with --overwrite (old ones kept as .bak).
+
 
 #include "Bezier.h"
 #include "Flight.h"
@@ -101,7 +94,7 @@ int main(int argc, char** argv)
             filesystem::rename(f, string(f) + ".bak");
         }
 
-    // ---- Fly the mission, recording every 0.1 s ----
+    //        Fly the mission, recording every 0.1 s       
     glm::dvec3 siteUp = glm::dvec3(surfaceDirection(SITE_LATITUDE, SITE_LONGITUDE));
     Flight flight;
     flight.reset(siteUp, LAUNCH_AZIMUTH);
@@ -133,7 +126,7 @@ int main(int argc, char** argv)
     tEnd = rec.back().t;
     printf("Separations at T+ %.1f %.1f %.1f %.1f %.1f %.1f s\n", events[0], events[1], events[2], events[3], events[4], events[5]);
 
-    // ---- Fit the curves ----
+    //        Fit the curves       
     printf("Fitting Bezier curves:\n");
     vector<ControlPoints> traj(TRAJ_COUNT);
     vector<double> start(TRAJ_COUNT, 0.0), length(TRAJ_COUNT, tEnd);
@@ -196,7 +189,7 @@ int main(int argc, char** argv)
     traj[TRAJ_CAMERA_EYE] = fitPath("camera eye", eye, 0.5 * ROCKET_SCALE);
     traj[TRAJ_CAMERA_TARGET] = fitPath("camera target", target, 0.3 * ROCKET_SCALE);
 
-    // ---- After the launch: Mangalyaan's own mission (shapes, not to scale) ----
+    //        After the launch: Mangalyaan's own mission (shapes, not to scale)       
     // 1. Orbit raising: two orbits whose apogee grows while the perigee
     //    stays low, as after each of the real perigee burns.
     glm::dvec3 p0 = glm::dvec3(evaluateBezier(traj[TRAJ_PAYLOAD], 1.0f));
@@ -259,7 +252,7 @@ int main(int argc, char** argv)
 
     for (const ControlPoints& c : traj) appendTrajectory("trajectory.txt", c);
 
-    // ---- Keyframes, with extra ones around each separation (slow motion) ----
+    //        Keyframes, with extra ones around each separation (slow motion)       
     vector<double> times = {5.0};
     for (double t = 15.0; t < tEnd; t += (t < 130.0 ? 10.0 : 30.0)) times.push_back(t);
     for (double e : events)

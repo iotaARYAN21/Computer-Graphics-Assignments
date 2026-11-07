@@ -21,10 +21,10 @@ Cylinder::Cylinder(int sectors, bool cone, bool halfCone)
     // This ensures halfCone covers exactly half a revolution.
     float angleStep = 2.0f * PI / static_cast<float>(sectors);
 
-    // -------------------------------------------------
+           
     // SIDE VERTICES
     // Each vertex: position(3), normal(3), UV(2)
-    // -------------------------------------------------
+           
 
     for (int i = 0; i <= actualSectors; ++i)
     {
@@ -50,9 +50,9 @@ Cylinder::Cylinder(int sectors, bool cone, bool halfCone)
         });
     }
 
-    // -------------------------------------------------
+           
     // SIDE TRIANGLES
-    // -------------------------------------------------
+           
 
     for (int i = 0; i < actualSectors; ++i)
     {
@@ -68,9 +68,9 @@ Cylinder::Cylinder(int sectors, bool cone, bool halfCone)
         });
     }
 
-    // -------------------------------------------------
+           
     // BOTTOM CAP
-    // -------------------------------------------------
+           
 
     unsigned int bottomCenter =
         static_cast<unsigned int>(vertices.size() / 8);
@@ -113,10 +113,10 @@ Cylinder::Cylinder(int sectors, bool cone, bool halfCone)
         });
     }
 
-    // -------------------------------------------------
+           
     // TOP CAP
     // Cylinders need a top cap; cones do not.
-    // -------------------------------------------------
+           
 
     if (!cone)
     {

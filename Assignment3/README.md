@@ -334,9 +334,3 @@ trajectory.txt, keyframes.txt   the animation data
 - [stb_image](https://github.com/nothings/stb) by Sean Barrett (public domain / MIT).
 - [GLM](https://github.com/g-truc/glm), [GLFW](https://www.glfw.org/),
   [GLEW](https://glew.sourceforge.net/).
-
-## Originality declaration
-We declare that the implementation and this report are our own work,
-except for the third-party libraries and resources acknowledged above.
-
-Team members: *(add names and roll numbers)*

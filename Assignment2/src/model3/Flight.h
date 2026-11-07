@@ -7,11 +7,10 @@
 #include <vector>
 
 // Simple point-mass flight model for the PSLV-C25 launch.
-//
 // Units: km, km/s, seconds. All positions are in the Earth-fixed frame
 // (Earth centre at the origin, +Y = north pole), so the rendering code only
 // has to apply Earth's rotation on top.
-//
+
 // Forces:
 //   - gravity, mu / r^2 towards Earth's centre (always)
 //   - thrust of the currently burning stage (while burning)
