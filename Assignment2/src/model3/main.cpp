@@ -91,13 +91,16 @@ struct OrbitCamera
     float yaw, pitch, distance, minDistance, maxDistance, minPitch;
 };
 
-// 0 = Earth view (world units), 1 = launch site, 2 = vehicle (model units)
-OrbitCamera cameras[3] = {
+// 0 = Earth view (world units), 1 = launch site, 2 = vehicle (model units),
+// 3 = planets view (world units)
+const int CAMERA_COUNT = 4;
+OrbitCamera cameras[CAMERA_COUNT] = {
     {0.0f, 0.0f, 90.0f, 33.0f, 650.0f, -89.0f},
     {-150.0f, 8.0f, 32.0f, 8.0f, 2000.0f, 2.0f}, // sunlit (south-west) side
     {-150.0f, 10.0f, 22.0f, 5.0f, 300.0f, -80.0f},
+    {25.0f, 0.0f, 165.0f, 60.0f, 700.0f, -80.0f}, // behind Earth, Mars beyond
 };
-const char* CAMERA_NAMES[3] = {"Earth view", "Launch site", "Vehicle"};
+const char* CAMERA_NAMES[CAMERA_COUNT] = {"Earth view", "Launch site", "Vehicle", "Planets (Earth + Mars)"};
 int cameraMode = 1;
 
 const int WARP_LEVELS[] = {1, 2, 5, 10, 20, 50};
@@ -269,7 +272,7 @@ void processInput(GLFWwindow* window, float deltaTime) {
         return result;
     };
 
-    if (pressed(GLFW_KEY_C)) cameraMode = (cameraMode + 1) % 3;
+    if (pressed(GLFW_KEY_C)) cameraMode = (cameraMode + 1) % CAMERA_COUNT;
     if (pressed(GLFW_KEY_L)) flight.launch();
     if (pressed(GLFW_KEY_R)) resetMission();
     if (pressed(GLFW_KEY_EQUAL) || pressed(GLFW_KEY_KP_ADD)) warpIndex = glm::min(warpIndex + 1, WARP_COUNT - 1);
@@ -352,7 +355,7 @@ int main() {
 
         cout << "\n=== a2-scene: PSLV-C25 / Mangalyaan ==="
              << "\n  L        : lift-off"
-             << "\n  C        : switch camera (Earth view / Launch site / Vehicle)"
+             << "\n  C        : switch camera (Earth view / Launch site / Vehicle / Planets)"
              << "\n  Arrows   : orbit the current camera"
              << "\n  [ and ]  : zoom in / out"
              << "\n  + and -  : time warp (1x to 50x)"
@@ -450,6 +453,16 @@ int main() {
                 cameraPos = sitePos + offset;
                 glm::vec3 target = flight.satelliteReleased ? worldSatPos : rocketCentre;
                 view = glm::lookAt(cameraPos, target, siteUp);
+            } else if (cameraMode == 3) {
+                // Planets view: from just behind Earth (on the side away from
+                // Mars), looking out towards Mars so both are in the frame.
+                // The orbit angles are measured around that line.
+                glm::vec3 towardMars = surfaceDirection(MARS_LATITUDE, MARS_LONGITUDE);
+                glm::vec3 right = glm::normalize(glm::cross(towardMars, glm::vec3(0.0f, 1.0f, 0.0f)));
+                glm::vec3 up = glm::cross(right, towardMars);
+                cameraPos = (right * orbit.x + up * orbit.y - towardMars * orbit.z) * cam.distance;
+                view = glm::lookAt(cameraPos, towardMars * (0.3f * MARS_DISTANCE), up);
+                nearPlane = 0.5f;
             } else {
                 // Vehicle camera: moves with the launch vehicle (then the payload).
                 glm::vec3 target = flight.satelliteReleased ? worldSatPos : rocketCentre;
@@ -532,7 +545,7 @@ int main() {
 
             // ---------------- Launch site ----------------
             glm::mat4 siteModel = worldSiteTransform * glm::scale(glm::mat4(1.0f), glm::vec3(ROCKET_SCALE));
-            if (cameraMode != 0) {
+            if (cameraMode == 1 || cameraMode == 2) {
                 // Ground patch around the pad (hidden in the distant view).
                 glm::mat4 groundModel = glm::translate(siteModel, glm::vec3(0.0f, 0.05f, 0.0f));
                 groundModel = glm::scale(groundModel, glm::vec3(5.0f, 1.0f, 5.0f));

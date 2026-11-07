@@ -94,23 +94,27 @@ and the vehicle in one scene.
 | Key | Action |
 |---|---|
 | L | lift-off |
-| C | cycle cameras: Earth view → Launch site → Vehicle |
+| C | cycle cameras: Launch site → Vehicle → Planets → Earth view (starts on Launch site) |
 | Arrow keys | orbit the current camera |
 | [ / ] | zoom the current camera |
 | + / − | time warp (1×, 2×, 5×, 10×, 20×, 50×) |
 | R | reset to the pad |
 | Esc | exit |
 
-The window title shows mission time, altitude, speed, the current stage
-and the time warp. Events are printed in the terminal.
+The window title shows mission time, altitude, speed, the current stage,
+the time warp and the active camera. Events are printed in the terminal.
 
 **Cameras**
 - *Earth view*: distant camera around Earth. In this view the flight path
-  is drawn as a thin line, so the whole launch can be followed. Zoom out
-  and orbit to see Mars and the Sun.
+  is drawn as a thin line, so the whole launch can be followed.
 - *Launch site*: fixed near the pad, always aimed at the vehicle.
 - *Vehicle*: moves with the launch vehicle (and with Mangalyaan after
   separation).
+- *Planets*: an extra camera, beyond the three required ones. It sits just
+  behind Earth on the side away from Mars and looks out towards Mars, so
+  Earth and Mars are both in view. Mars was about 98° away from India in
+  the sky on launch day, so no single camera can show both India and
+  Mars. That is why this view is separate.
 
 **Motion.** `src/model3/Flight.cpp` integrates a point-mass model in real
 units (km, km/s) with a fixed 0.02 s step:
