@@ -178,11 +178,8 @@ src/model3/       a2-scene (main.cpp + Flight.cpp flight model)
   (vehicle configuration, flight sequence and event altitudes; add link).
 - Earth texture: `textures/earth.jpg` (equirectangular Earth image; add
   its source here).
-- Mars texture: `textures/Mars.jpg` (add its source here).
-- Ground texture: `textures/groundTexture.jpg` (add its source here).
+- Mars texture: `textures/Mars.jpg` ([NASA](https://science.nasa.gov/3d-resources/mars/)).
+- Ground texture: `textures/groundTexture.jpg` ([Unsplash](https://unsplash.com/photos/green-grass-field-during-daytime-IkghfzzIC2s)).
 - E. M. Standish, *Keplerian Elements for Approximate Positions of the
   Major Planets* (JPL), used for the Sun and Mars directions at launch.
-- [stb_image](https://github.com/nothings/stb) by Sean Barrett (public domain / MIT).
-- [GLM](https://github.com/g-truc/glm), [GLFW](https://www.glfw.org/),
-  [GLEW](https://glew.sourceforge.net/).
 
