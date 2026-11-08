@@ -169,11 +169,6 @@ invisible, so the vehicle, the launch site and the relative motion of
 separated parts are drawn about 140× larger. The trajectory itself uses
 real distances.
 
-## Use of Blender
-No component was modelled in Blender. All geometry (cylinders, cones, cubes,
-fairing halves, the Earth, Mars and Sun spheres) is generated in code under `src/models/`
-and `src/common/`.
-
 ## Project layout
 
 ```
