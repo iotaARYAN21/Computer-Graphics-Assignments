@@ -176,8 +176,7 @@ src/model3/       a2-scene (main.cpp + Flight.cpp flight model)
 ## References and acknowledgements
 - ISRO, *PSLV-C25 / Mars Orbiter Mission* brochure and launch press kit
   (vehicle configuration, flight sequence and event altitudes; add link).
-- Earth texture: `textures/earth.jpg` (equirectangular Earth image; add
-  its source here).
+- Earth texture: `textures/earth.jpg` ([NASA] https://science.nasa.gov/resource/blue-marble/?utm_source=chatgpt.com).
 - Mars texture: `textures/Mars.jpg` ([NASA](https://science.nasa.gov/3d-resources/mars/)).
 - Ground texture: `textures/groundTexture.jpg` ([Unsplash](https://unsplash.com/photos/green-grass-field-during-daytime-IkghfzzIC2s)).
 - E. M. Standish, *Keplerian Elements for Approximate Positions of the

@@ -197,14 +197,14 @@ the origin).
 
 | # | Object | # | Object |
 |---|---|---|---|
-| 1 | launch vehicle | 10 | Mangalyaan: Earth orbit raising |
-| 2 | strap-on boosters (all four) | 11 | Mangalyaan: cruise to Mars |
-| 3 | PS1 | 12 | Mangalyaan: Mars orbit |
-| 4 | payload fairing (both halves) | 13, 14 | camera eye / target, orbit raising |
-| 5 | PS2 | 15, 16 | camera eye / target, cruise |
-| 6 | PS3 | 17, 18 | camera eye / target, Mars orbit |
-| 7 | Mangalyaan after separation | | |
-| 8, 9 | camera eye / target, launch | | |
+| 1 | launch vehicle                    | 10 | Mangalyaan: Earth orbit raising |
+| 2 | strap-on boosters (all four)      | 11 | Mangalyaan: cruise to Mars |
+| 3 | PS1                               | 12 | Mangalyaan: Mars orbit |
+| 4 | payload fairing (both halves)     | 13, 14 | camera eye / target, orbit raising |
+| 5 | PS2                               | 15, 16 | camera eye / target, cruise |
+| 6 | PS3                               | 17, 18 | camera eye / target, Mars orbit |
+| 7 | Mangalyaan after separation       |   |
+| 8, 9 | camera eye / target, launch    |   |
 
 Each separated part's curve starts on the vehicle curve at its separation,
 and each of Mangalyaan's curves starts where the previous one ends. Blocks
@@ -318,8 +318,7 @@ trajectory.txt, keyframes.txt   the animation data
 ## References and acknowledgements
 - ISRO, *PSLV-C25 / Mars Orbiter Mission* brochure and launch press kit
   (vehicle configuration, flight sequence and event altitudes; add link).
-- Earth texture: `textures/earth.jpg` (equirectangular Earth image; add
-  its source here).
+- Earth texture: `textures/earth.jpg` ([NASA] https://science.nasa.gov/resource/blue-marble/?utm_source=chatgpt.com).
 - Mars texture: `textures/Mars.jpg` ([NASA](https://science.nasa.gov/3d-resources/mars/)).
 - Ground texture: `textures/groundTexture.jpg` ([Unsplash](https://unsplash.com/photos/green-grass-field-during-daytime-IkghfzzIC2s)).
 - E. M. Standish, *Keplerian Elements for Approximate Positions of the
