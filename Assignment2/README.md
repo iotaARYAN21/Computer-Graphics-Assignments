@@ -1,5 +1,8 @@
 # CS5024 Assignment 2 – PSLV-C25 / Mars Orbiter Mission (Mangalyaan)
 
+Team members: ARYAN 11230141
+              SUJIT KUMAR CHOUDHARY -112301001
+
 We recreate the launch of **PSLV-C25** carrying the **Mars Orbiter Mission
 (Mangalyaan)** spacecraft, launched on **5 November 2013 at 14:38 IST
 (09:08 UTC)** from the First Launch Pad, Satish Dhawan Space Centre,
@@ -8,19 +11,6 @@ Sriharikota (13.72° N, 80.23° E).
 ## Building
 
 Requirements: a C++17 compiler, CMake ≥ 3.10, OpenGL 3.3, GLEW and GLFW 3.
-
-On Ubuntu/Debian:
-
-```bash
-sudo apt install build-essential cmake libglew-dev libglfw3-dev
-```
-
-GLM is expected in `glm/` inside this folder (header-only; we used the
-1.1.0 development version, any 1.x release works). If it is missing:
-
-```bash
-git clone --depth 1 https://github.com/g-truc/glm.git glm
-```
 
 Build:
 

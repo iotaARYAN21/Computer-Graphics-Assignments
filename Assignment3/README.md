@@ -1,5 +1,8 @@
 # CS5024 Assignment 3 – PSLV-C25 / Mars Orbiter Mission (Mangalyaan)
 
+Team members: ARYAN 11230141
+              SUJIT KUMAR CHOUDHARY -112301001
+
 This folder extends the Assignment 2 project (see `../Assignment2`) with
 a Bézier trajectory editor and keyframe animation. The Assignment 2 model
 viewers are kept unchanged; the integrated scene is now `a3-scene`.
@@ -327,6 +330,4 @@ trajectory.txt, keyframes.txt   the animation data
 
 
 
-Team members: ARYAN 11230141
-              SUJIT KUMAR CHOUDHARY -112301001
 
