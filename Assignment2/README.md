@@ -134,17 +134,13 @@ After each event the simulation runs at 1× for a few seconds so the
 separation can be seen, then returns to the selected time warp.
 
 **Earth rotation and lighting.** Earth turns at the sidereal rate (scaled
-by the time warp) during the mission. The Sun is fixed in space. Its
-direction at launch time (RA 220.5°, Dec −15.7°, computed from the JPL
-approximate planetary elements) puts the Sun in the south-west at about
-40° elevation over Sriharikota, matching the 14:38 IST launch. The sky is
+by the time warp) during the mission. The Sun is fixed in space. The sky is
 blue near the sunlit ground and fades to black space with camera
 altitude.
 
 **Celestial bodies.** Mangalyaan is a Mars mission, so the scene includes:
 - *Mars*: textured sphere, lit by the Sun and slowly rotating (one sol =
-  24.6 h). It is placed in its real direction on launch day (RA 164.1°,
-  Dec +8.5°, in Leo, 1.89 AU away), so it is a morning planet and below
+  24.6 h). It is placed in its real direction on launch day, so it is a morning planet and below
   the horizon at Sriharikota during the launch.
 - *The Sun*: a self-lit disc in the same direction as the scene light,
   visible in the daytime sky from the launch-site camera.
@@ -176,7 +172,7 @@ src/model3/       a2-scene (main.cpp + Flight.cpp flight model)
 ## References and acknowledgements
 - ISRO, *PSLV-C25 / Mars Orbiter Mission* brochure and launch press kit
   (vehicle configuration, flight sequence and event altitudes; add link).
-- Earth texture: `textures/earth.jpg` ([NASA] https://science.nasa.gov/resource/blue-marble/?utm_source=chatgpt.com).
+- Earth texture: `textures/earth.jpg` ([NASA](https://science.nasa.gov/resource/blue-marble/)).
 - Mars texture: `textures/Mars.jpg` ([NASA](https://science.nasa.gov/3d-resources/mars/)).
 - Ground texture: `textures/groundTexture.jpg` ([Unsplash](https://unsplash.com/photos/green-grass-field-during-daytime-IkghfzzIC2s)).
 - E. M. Standish, *Keplerian Elements for Approximate Positions of the

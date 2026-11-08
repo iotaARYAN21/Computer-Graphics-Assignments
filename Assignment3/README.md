@@ -4,8 +4,7 @@ Team members: ARYAN 11230141
               SUJIT KUMAR CHOUDHARY -112301001
 
 This folder extends the Assignment 2 project (see `../Assignment2`) with
-a Bézier trajectory editor and keyframe animation. The Assignment 2 model
-viewers are kept unchanged; the integrated scene is now `a3-scene`.
+a Bézier trajectory editor and keyframe animation. 
 
 We recreate the launch of **PSLV-C25** carrying the **Mars Orbiter Mission
 (Mangalyaan)** spacecraft, launched on **5 November 2013 at 14:38 IST
@@ -111,16 +110,13 @@ and `keyframes.txt` (see *Assignment 3* below).
   from Mars, so Mars is behind it and its motion around Mars is easy to
   see (`]` zooms out to the whole orbit). Before that, it shows Mars.
 
-**Lighting.** The Sun direction at launch time (RA 220.5°, Dec −15.7°,
-from the JPL approximate planetary elements) puts the Sun in the
+**Lighting.** The Sun direction at launch time  puts the Sun in the
 south-west at about 40° elevation over Sriharikota, matching the 14:38 IST
 launch. The sky is blue near the sunlit ground and fades to black with
 altitude.
 
 **Celestial bodies.** Mangalyaan is a Mars mission, so the scene includes:
-- *Mars*: textured sphere, lit by the Sun. It is placed in its real direction on launch day (RA 164.1°,
-  Dec +8.5°, in Leo, 1.89 AU away), so it is a morning planet and below
-  the horizon at Sriharikota during the launch.
+- *Mars*: textured sphere, lit by the Sun. It is placed in its real direction on launch day , so it is a morning planet and below the horizon at Sriharikota during the launch.
 - *The Sun*: a self-lit disc in the same direction as the scene light,
   visible in the daytime sky from the launch-site camera.
 
@@ -227,7 +223,6 @@ active_1 u_1  active_2 u_2  ...  active_18 u_18   stage engine tilt
 - `tilt` is the vehicle's angle from the local vertical, in degrees. Each
   separated part keeps the tilt it had at separation and tumbles slowly.
 
-Lines starting with `#` are comments.
 
 **Playback.** Every keyframe interval lasts a fixed 60 frames. Curve
 parameters and `tilt` are interpolated linearly. `active`, `stage` and
@@ -292,10 +287,6 @@ shifted, and scaling or moving a Bézier curve's control points scales or
 moves the curve exactly, so the camera follows the spacecraft precisely.
 The cut between phases is a planned camera change.
 
-## Use of Blender
- All geometry (cylinders, cones, cubes,
-fairing halves, the Earth, Mars and Sun spheres) is generated in code under `src/models/`
-and `src/common/`.
 
 ## Project layout
 
@@ -318,7 +309,7 @@ trajectory.txt, keyframes.txt   the animation data
 ## References and acknowledgements
 - ISRO, *PSLV-C25 / Mars Orbiter Mission* brochure and launch press kit
   (vehicle configuration, flight sequence and event altitudes; add link).
-- Earth texture: `textures/earth.jpg` ([NASA] https://science.nasa.gov/resource/blue-marble/?utm_source=chatgpt.com).
+- Earth texture: `textures/earth.jpg` ([NASA](https://science.nasa.gov/resource/blue-marble/)).
 - Mars texture: `textures/Mars.jpg` ([NASA](https://science.nasa.gov/3d-resources/mars/)).
 - Ground texture: `textures/groundTexture.jpg` ([Unsplash](https://unsplash.com/photos/green-grass-field-during-daytime-IkghfzzIC2s)).
 - E. M. Standish, *Keplerian Elements for Approximate Positions of the
