@@ -98,7 +98,7 @@ struct OrbitCamera
 const int CAMERA_COUNT = 4;
 OrbitCamera cameras[CAMERA_COUNT] = {
     {0.0f, 0.0f, 90.0f, 33.0f, 650.0f, -89.0f},
-    {-150.0f, 8.0f, 32.0f, 8.0f, 2000.0f, 2.0f}, // sunlit (south-west) side
+    {150.0f, 8.0f, 32.0f, 8.0f, 2000.0f, 2.0f}, // sunlit (south-west) side
     {-150.0f, 10.0f, 22.0f, 5.0f, 300.0f, -80.0f},
     {25.0f, 0.0f, 165.0f, 60.0f, 700.0f, -80.0f}, // behind Earth, Mars beyond
 };
@@ -451,7 +451,10 @@ int main() {
             } else if (cameraMode == 1) {
                 // Launch-site camera: fixed near the pad, tracks the vehicle.
                 float d = cam.distance * ROCKET_SCALE;
-                glm::vec3 offset = siteRight * (d * orbit.x) + siteUp * (d * orbit.y) + siteForward * (d * orbit.z);
+                // The site frame (east, up, north) is left-handed, so east is
+                // negated here; otherwise Left/Right would orbit the opposite
+                // way to the other cameras.
+                glm::vec3 offset = -siteRight * (d * orbit.x) + siteUp * (d * orbit.y) + siteForward * (d * orbit.z);
                 cameraPos = sitePos + offset;
                 glm::vec3 target = flight.satelliteReleased ? worldSatPos : rocketCentre;
                 view = glm::lookAt(cameraPos, target, siteUp);
@@ -540,6 +543,8 @@ int main() {
             glDepthMask(GL_FALSE);
             setMatrices(atmosphereProgram, glm::scale(earthModel, glm::vec3(1.03f)), view, projection);
             glUniform3fv(glGetUniformLocation(atmosphereProgram, "cameraPos"), 1, glm::value_ptr(cameraPos));
+            glUniform1f(glGetUniformLocation(atmosphereProgram, "earthRadius"), EARTH_RADIUS);
+            glUniform1f(glGetUniformLocation(atmosphereProgram, "shellRadius"), 1.03f * EARTH_RADIUS);
             earthMesh->draw();
             glDepthMask(GL_TRUE);
 
@@ -568,7 +573,7 @@ int main() {
             glBindTexture(GL_TEXTURE_2D, 0);
 
             glm::mat4 padBase = glm::translate(siteModel, glm::vec3(0.0f, 0.23f, 0.0f));
-            padBase = glm::scale(padBase, glm::vec3(6.0f, 0.36f, 5.0f));
+            padBase = glm::scale(padBase, glm::vec3(6.0f, 0.36f, 6.5f)); // deep enough for the service tower
             setMatrices(rocketProgram, padBase, view, projection);
             glUniform3fv(glGetUniformLocation(rocketProgram, "lightPos"), 1, glm::value_ptr(lightPos));
             glUniform3f(glGetUniformLocation(rocketProgram, "objectColor"), 0.48f, 0.49f, 0.52f);
@@ -616,7 +621,7 @@ int main() {
 
                 // Service tower: columns, horizontal frames and diagonal braces.
                 const glm::vec3 steelColor(0.65f, 0.68f, 0.72f);
-                const float towerX = 2.0f, towerZ = 0.0f; // east side, away from the afternoon Sun
+                const float towerX = 0.0f, towerZ = 2.0f; // north side: out of the flight path (launch azimuth 104 deg) and the Sun (south-west)
                 const float towerHeight = 11.0f, towerWidth = 2.0f, beamThickness = 0.10f;
                 const float bottomY = 0.36f;
                 const float halfW = towerWidth * 0.5f, halfT = beamThickness * 0.5f, halfH = towerHeight * 0.5f;
@@ -656,11 +661,11 @@ int main() {
                     const float rocketBase = PAD_TOP - GROUND_Y;
                     const float armHeights[] = {3.0f, 4.9f, 6.9f, 7.9f};
                     const float armRadius[] = {0.725f, 0.56f, 0.44f, 0.36f};
-                    float towerInner = towerX - halfW;
+                    float towerInner = towerZ - halfW;
                     for (int i = 0; i < 4; ++i) {
                         float length = towerInner - armRadius[i];
-                        drawSiteBox(glm::vec3(towerInner - 0.5f * length, rocketBase + armHeights[i], towerZ),
-                                    glm::vec3(length, 0.12f, 0.18f), steelColor);
+                        drawSiteBox(glm::vec3(towerX, rocketBase + armHeights[i], towerInner - 0.5f * length),
+                                    glm::vec3(0.18f, 0.12f, length), steelColor);
                     }
                 }
             }

@@ -337,7 +337,7 @@ int main()
             // Main concrete launch platform.
             drawCube(cube, cubeProgram, view, projection,
                      glm::vec3(0.0f, 0.18f, 0.0f),
-                     glm::vec3(6.0f, 0.36f, 5.0f),
+                     glm::vec3(6.0f, 0.36f, 6.5f), // deep enough for the service tower
                      glm::vec3(0.48f, 0.49f, 0.52f));
             // Raised central launch pedestal.
             drawCube(cube, cubeProgram, view, projection,
@@ -373,8 +373,8 @@ int main()
               
             glm::vec3 steelColor(0.65f, 0.68f, 0.72f);
             // Position and dimensions
-            float towerX = 2.0f;
-            float towerZ = 0.0f;
+            float towerX = 0.0f;
+            float towerZ = 2.0f; // north side, out of the flight path
             float towerHeight = 11.0f;
             float towerWidth = 2.0f;
             float beamThickness = 0.10f;
