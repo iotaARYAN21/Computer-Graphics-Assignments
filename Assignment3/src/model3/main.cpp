@@ -100,6 +100,22 @@ glm::mat3 frameAt(const glm::vec3& pos, float tiltDeg) {
     return glm::mat3(x, axis, glm::cross(x, axis));
 }
 
+// Custom flight: if a curve was drawn in the editor (E), P flies the whole
+// rocket along it (no separations) and it stops at the curve's end.
+// Without a drawn curve, P plays the keyframed mission as before.
+const int CUSTOM_FLIGHT_FRAMES = 600;
+bool customFlight = false;
+ControlPoints customCurve;
+
+// Vehicle axes pointing along a Bezier curve at parameter u.
+glm::mat3 frameAlong(const ControlPoints& c, float u) {
+    glm::vec3 axis = evaluateBezier(c, glm::min(u + 0.002f, 1.0f)) - evaluateBezier(c, glm::max(u - 0.002f, 0.0f));
+    axis = glm::length(axis) > 1e-9f ? glm::normalize(axis) : glm::vec3(0.0f, 1.0f, 0.0f);
+    glm::vec3 ref = fabs(axis.y) > 0.99f ? glm::vec3(1.0f, 0.0f, 0.0f) : glm::vec3(0.0f, 1.0f, 0.0f);
+    glm::vec3 x = glm::normalize(glm::cross(axis, ref));
+    return glm::mat3(x, axis, glm::cross(x, axis));
+}
+
 // Bezier trajectory editor (E toggles it) and queued mouse clicks.
 TrajectoryEditor editor;
 bool editorNeedsFocus = true;
@@ -298,10 +314,20 @@ void processInput(GLFWwindow* window, float deltaTime) {
     if (pressed(GLFW_KEY_P)) { // start the animation from the first keyframe
         loadAnimation();
         resetMission();
-        playing = animationReady;
-        userCamera = false;
+        editor.active = false; // leave the editor so the scene cameras (and C) work
+        pendingClicks.clear();
+        customFlight = editor.current.size() >= 2;
+        if (customFlight) {
+            customCurve = editor.current;
+            playing = true;
+            userCamera = true; // the keyframed camera does not follow a drawn curve
+            cameraMode = 2;    // vehicle camera
+        } else {
+            playing = animationReady;
+            userCamera = false;
+        }
     }
-    if (pressed(GLFW_KEY_SPACE) && animationReady) playing = !playing;
+    if (pressed(GLFW_KEY_SPACE) && (animationReady || customFlight)) playing = !playing;
     if (pressed(GLFW_KEY_R)) resetMission();
 }
 
@@ -410,20 +436,23 @@ int main() {
             processInput(window, deltaTime);
 
             // ---------------- Animation state ----------------
+            bool keysActive = animationReady && !customFlight;
             FrameState st;
-            if (animationReady) {
+            if (customFlight && playing && ++frame >= CUSTOM_FLIGHT_FRAMES) { frame = CUSTOM_FLIGHT_FRAMES; playing = false; }
+            float customU = customFlight ? glm::clamp(float(frame) / CUSTOM_FLIGHT_FRAMES, 0.0f, 1.0f) : 0.0f;
+            if (keysActive) {
                 st = interpolateKeyframes(keyframes, frame, FRAMES_PER_INTERVAL, fieldIsDiscrete);
                 int last = totalFrames(static_cast<int>(keyframes.size()), FRAMES_PER_INTERVAL) - 1;
                 if (playing && ++frame > last) { frame = last; playing = false; }
             }
             auto onPath = [&](int id, glm::vec3& p) {
-                if (!animationReady || !st.active[id]) return false;
+                if (!keysActive || !st.active[id]) return false;
                 p = evaluateBezier(trajectories[id], st.u[id]);
                 return true;
             };
-            int stage = animationReady ? static_cast<int>(st.extra[FIELD_STAGE] + 0.5f) : STAGE_ON_PAD;
-            bool engineOn = animationReady && st.extra[FIELD_ENGINE] > 0.5f;
-            float tilt = animationReady ? st.extra[FIELD_TILT] : 0.0f;
+            int stage = keysActive ? static_cast<int>(st.extra[FIELD_STAGE] + 0.5f) : STAGE_ON_PAD;
+            bool engineOn = (keysActive && st.extra[FIELD_ENGINE] > 0.5f) || (customFlight && playing);
+            float tilt = keysActive ? st.extra[FIELD_TILT] : 0.0f;
 
             int width, height;
             glfwGetFramebufferSize(window, &width, &height);
@@ -441,6 +470,7 @@ int main() {
             // Vehicle base position (on the pad until the animation moves it).
             glm::vec3 vehiclePos = sitePos + siteUp * (PAD_TOP * ROCKET_SCALE);
             onPath(TRAJ_VEHICLE, vehiclePos);
+            if (customFlight) vehiclePos = evaluateBezier(customCurve, customU);
             float altitude = glm::max((glm::length(vehiclePos) - EARTH_RADIUS - PAD_TOP * ROCKET_SCALE) / KM_TO_WORLD, 0.0f);
 
             auto placeFrame = [&](const glm::vec3& pos, const glm::mat3& frame) {
@@ -449,7 +479,7 @@ int main() {
                 return m * glm::scale(glm::mat4(1.0f), glm::vec3(ROCKET_SCALE));
             };
 
-            glm::mat4 rocketTransform = placeFrame(vehiclePos, frameAt(vehiclePos, tilt));
+            glm::mat4 rocketTransform = placeFrame(vehiclePos, customFlight ? frameAlong(customCurve, customU) : frameAt(vehiclePos, tilt));
             glm::vec3 rocketRight = glm::normalize(glm::vec3(rocketTransform[0]));
             glm::vec3 rocketUp = glm::normalize(glm::vec3(rocketTransform[1]));
             glm::vec3 rocketForward = glm::normalize(glm::vec3(rocketTransform[2]));
@@ -468,8 +498,8 @@ int main() {
             // pointing along its direction of travel and drawn larger.
             int spacePath = -1;
             for (int id : {TRAJ_ORBIT_RAISING, TRAJ_CRUISE, TRAJ_MARS_ORBIT})
-                if (animationReady && st.active[id]) spacePath = id;
-            bool vehicleVisible = !animationReady || st.active[TRAJ_VEHICLE];
+                if (keysActive && st.active[id]) spacePath = id;
+            bool vehicleVisible = !keysActive || st.active[TRAJ_VEHICLE];
             if (spacePath >= 0) {
                 const ControlPoints& c = trajectories[spacePath];
                 float u = st.u[spacePath];
@@ -492,7 +522,7 @@ int main() {
             // Active keyframed camera: an eye trajectory followed by its target.
             int keyCameraEye = -1;
             for (int id : {TRAJ_CAMERA_EYE, TRAJ_EYE_ORBIT, TRAJ_EYE_CRUISE, TRAJ_EYE_MARS})
-                if (animationReady && st.active[id] && st.active[id + 1]) keyCameraEye = id;
+                if (keysActive && st.active[id] && st.active[id + 1]) keyCameraEye = id;
 
             glm::mat4 view;
             glm::vec3 cameraPos;
@@ -936,7 +966,7 @@ int main() {
 
             // ---------------- Path so far: vehicle (manual Earth view) or Mangalyaan ----------------
             int trailPath = spacePath >= 0 ? spacePath
-                          : (userCamera && cameraMode == 0 && animationReady && st.active[TRAJ_VEHICLE]) ? TRAJ_VEHICLE : -1;
+                          : (userCamera && cameraMode == 0 && keysActive && st.active[TRAJ_VEHICLE]) ? TRAJ_VEHICLE : -1;
             if (trailPath >= 0) {
                 vector<glm::vec3> points;
                 for (int i = 0; i <= 1000; ++i)
@@ -953,7 +983,7 @@ int main() {
             }
 
             // ---------------- Trajectories (editor and loaded curves) ----------------
-            if (editor.active || (editor.showLoaded && !editor.loaded.empty())) {
+            if (editor.active || customFlight || (editor.showLoaded && !editor.loaded.empty())) {
                 auto drawLines = [&](const vector<glm::vec3>& points, const glm::vec3& colour, GLenum mode) {
                     if (points.size() < 2) return;
                     glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
@@ -985,6 +1015,9 @@ int main() {
                         for (const glm::vec3& p : pts) drawMarker(p, 0.006f, colour);
                     }
                 }
+
+                if (customFlight && !editor.active) // the drawn path the rocket is flying
+                    drawLines(sampleBezier(customCurve, 300), glm::vec3(1.0f, 1.0f, 0.3f), GL_LINE_STRIP);
 
                 if (editor.active) {
                     const glm::vec3 pointColour(1.0f, 1.0f, 0.3f);
@@ -1022,7 +1055,7 @@ int main() {
                     if (spacePath < 0) snprintf(alt, sizeof(alt), " | alt %.1f km", altitude);
                     snprintf(title, sizeof(title),
                              "a3-scene | %s | frame %d (keyframe %d of %zu)%s | %s | camera: %s",
-                             playing ? "PLAYING" : (animationReady ? "press P to play" : "no keyframes"),
+                             playing ? "PLAYING" : (animationReady || customFlight ? "press P to play" : "no keyframes"),
                              frame, frame / FRAMES_PER_INTERVAL + 1, keyframes.size(), alt,
                              spacePath == TRAJ_ORBIT_RAISING ? (engineOn ? "Earth orbit raising: perigee burn" : "Earth orbit raising")
                              : spacePath == TRAJ_CRUISE ? (engineOn ? (st.u[TRAJ_CRUISE] < 0.5f ? "Trans-Mars Injection burn" : "Mars Orbit Insertion burn") : "cruise to Mars")
