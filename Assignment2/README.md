@@ -83,8 +83,8 @@ payload fairing and the Mangalyaan spacecraft.
 | Arrow keys, [ / ] | orbit and zoom camera |
 | B | separate strap-on boosters |
 | F | separate payload fairing (reveals Mangalyaan) |
-| S | sequential stage separation (after F) |
-| D | deploy Mangalyaan (after S) |
+| S | sequential stage separation (also releases the boosters) |
+| D | deploy Mangalyaan (also opens the fairing) |
 | Esc | exit |
 
 ### a2-scene: Integrated launch

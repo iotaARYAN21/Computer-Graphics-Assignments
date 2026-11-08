@@ -3,6 +3,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/quaternion.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "../stb_image.h"
@@ -42,7 +44,7 @@ const float EARTH_RADIUS = 30.0f;
 const float KM_TO_WORLD = EARTH_RADIUS / static_cast<float>(EARTH_RADIUS_KM);
 const float ROCKET_SCALE = 0.003f;               // model units -> world units
 const float MODEL_UNITS_PER_METRE = 9.83f / 44.4f; // model height / real height
-const float PAD_TOP = 0.41f;                     // pad height in model units
+const float PAD_TOP = 0.745f;                    // top of the launch pedestal in model units
 
 // Separated parts are drawn relative to the vehicle with the same
 // magnification as the vehicle, so separations look right next to it.
@@ -456,12 +458,18 @@ int main() {
             } else if (cameraMode == 3) {
                 // Planets view: from just behind Earth (on the side away from
                 // Mars), looking out towards Mars so both are in the frame.
-                // The orbit angles are measured around that line.
+                // The camera orbits around the point it looks at (between
+                // Earth and Mars), so turning left/right always rotates the
+                // view in the same direction. cam.distance is the distance
+                // behind Earth's centre in the default view.
                 glm::vec3 towardMars = surfaceDirection(MARS_LATITUDE, MARS_LONGITUDE);
                 glm::vec3 right = glm::normalize(glm::cross(towardMars, glm::vec3(0.0f, 1.0f, 0.0f)));
                 glm::vec3 up = glm::cross(right, towardMars);
-                cameraPos = (right * orbit.x + up * orbit.y - towardMars * orbit.z) * cam.distance;
-                view = glm::lookAt(cameraPos, towardMars * (0.3f * MARS_DISTANCE), up);
+                float targetDistance = 0.3f * MARS_DISTANCE;
+                glm::vec3 target = towardMars * targetDistance;
+                float radius = cam.distance + targetDistance;
+                cameraPos = target + (right * orbit.x + up * orbit.y - towardMars * orbit.z) * radius;
+                view = glm::lookAt(cameraPos, target, up);
                 nearPlane = 0.5f;
             } else {
                 // Vehicle camera: moves with the launch vehicle (then the payload).
@@ -565,6 +573,97 @@ int main() {
             glUniform3fv(glGetUniformLocation(rocketProgram, "lightPos"), 1, glm::value_ptr(lightPos));
             glUniform3f(glGetUniformLocation(rocketProgram, "objectColor"), 0.48f, 0.49f, 0.52f);
             cube.draw();
+
+            //    Launch-site structures (same as a2-model-1)
+            // Positions are the a2-model-1 values shifted up by the 0.05
+            // ground offset used in this scene.
+            {
+                const float GROUND_Y = 0.05f;
+                auto drawSiteBox = [&](glm::vec3 pos, const glm::vec3& scale, const glm::vec3& color) {
+                    pos.y += GROUND_Y;
+                    glm::mat4 m = glm::translate(siteModel, pos);
+                    m = glm::scale(m, scale);
+                    setMatrices(rocketProgram, m, view, projection);
+                    glUniform3fv(glGetUniformLocation(rocketProgram, "lightPos"), 1, glm::value_ptr(lightPos));
+                    glUniform3fv(glGetUniformLocation(rocketProgram, "objectColor"), 1, glm::value_ptr(color));
+                    cube.draw();
+                };
+                auto drawSiteBeam = [&](glm::vec3 start, glm::vec3 end, float thickness, const glm::vec3& color) {
+                    glm::vec3 dir = end - start;
+                    float length = glm::length(dir);
+                    if (length < 0.0001f) return;
+                    glm::vec3 mid = (start + end) * 0.5f;
+                    mid.y += GROUND_Y;
+                    glm::mat4 m = glm::translate(siteModel, mid);
+                    m *= glm::mat4_cast(glm::rotation(glm::vec3(0.0f, 1.0f, 0.0f), dir / length));
+                    m = glm::scale(m, glm::vec3(thickness, length, thickness));
+                    setMatrices(rocketProgram, m, view, projection);
+                    glUniform3fv(glGetUniformLocation(rocketProgram, "lightPos"), 1, glm::value_ptr(lightPos));
+                    glUniform3fv(glGetUniformLocation(rocketProgram, "objectColor"), 1, glm::value_ptr(color));
+                    cube.draw();
+                };
+
+                // Raised central launch pedestal.
+                drawSiteBox(glm::vec3(0.0f, 0.52f, 0.0f), glm::vec3(2.0f, 0.35f, 2.0f), glm::vec3(0.68f, 0.69f, 0.71f));
+
+                // Simplified launch-site towers.
+                const glm::vec3 towerColor(1.0f, 0.65f, 0.0f);
+                const glm::vec3 towerPositions[] = {
+                    glm::vec3(-4.5f, 2.0f, -3.5f), glm::vec3(4.5f, 2.0f, -3.5f),
+                    glm::vec3(-4.5f, 2.0f, 3.5f), glm::vec3(4.5f, 2.0f, 3.5f)};
+                for (const glm::vec3& p : towerPositions)
+                    drawSiteBox(p, glm::vec3(0.35f, 4.0f, 0.35f), towerColor);
+
+                // Service tower: columns, horizontal frames and diagonal braces.
+                const glm::vec3 steelColor(0.65f, 0.68f, 0.72f);
+                const float towerX = 2.0f, towerZ = 0.0f; // east side, away from the afternoon Sun
+                const float towerHeight = 11.0f, towerWidth = 2.0f, beamThickness = 0.10f;
+                const float bottomY = 0.36f;
+                const float halfW = towerWidth * 0.5f, halfT = beamThickness * 0.5f, halfH = towerHeight * 0.5f;
+
+                for (int xSide = -1; xSide <= 1; xSide += 2)
+                    for (int zSide = -1; zSide <= 1; zSide += 2)
+                        drawSiteBox(glm::vec3(towerX + xSide * (halfW - halfT), bottomY + halfH, towerZ + zSide * (halfW - halfT)),
+                                    glm::vec3(beamThickness, towerHeight, beamThickness), steelColor);
+
+                for (int level = 0; level <= 8; level++) {
+                    float y = bottomY + towerHeight * level / 8.0f;
+                    drawSiteBox(glm::vec3(towerX, y, towerZ - halfW), glm::vec3(towerWidth, halfT, halfT), steelColor);
+                    drawSiteBox(glm::vec3(towerX, y, towerZ + halfW), glm::vec3(towerWidth, halfT, halfT), steelColor);
+                    drawSiteBox(glm::vec3(towerX - halfW, y, towerZ), glm::vec3(halfT, halfT, towerWidth), steelColor);
+                    drawSiteBox(glm::vec3(towerX + halfW, y, towerZ), glm::vec3(halfT, halfT, towerWidth), steelColor);
+                }
+
+                for (int level = 0; level < 8; level++) {
+                    float y0 = bottomY + towerHeight * level / 8.0f;
+                    float y1 = bottomY + towerHeight * (level + 1) / 8.0f;
+                    // Back and front faces.
+                    for (float z : {towerZ - halfW, towerZ + halfW}) {
+                        drawSiteBeam(glm::vec3(towerX - halfW, y0, z), glm::vec3(towerX + halfW, y1, z), 0.07f, steelColor);
+                        drawSiteBeam(glm::vec3(towerX + halfW, y0, z), glm::vec3(towerX - halfW, y1, z), 0.07f, steelColor);
+                    }
+                    // Left and right faces.
+                    for (float x : {towerX - halfW, towerX + halfW}) {
+                        drawSiteBeam(glm::vec3(x, y0, towerZ - halfW), glm::vec3(x, y1, towerZ + halfW), 0.07f, steelColor);
+                        drawSiteBeam(glm::vec3(x, y0, towerZ + halfW), glm::vec3(x, y1, towerZ - halfW), 0.07f, steelColor);
+                    }
+                }
+
+                // Umbilical arms from the tower to the vehicle, removed at lift-off.
+                // Heights are along the rocket (from its base); radius is the
+                // rocket's radius at that height (PS1, PS2, PS3, PS4).
+                if (!flight.launched) {
+                    const float rocketBase = PAD_TOP - GROUND_Y;
+                    const float armHeights[] = {3.0f, 4.9f, 6.9f, 7.9f};
+                    const float armRadius[] = {0.725f, 0.56f, 0.44f, 0.36f};
+                    float towerInner = towerX - halfW;
+                    for (int i = 0; i < 4; ++i) {
+                        float length = towerInner - armRadius[i];
+                        drawSiteBox(glm::vec3(towerInner - 0.5f * length, rocketBase + armHeights[i], towerZ),
+                                    glm::vec3(length, 0.12f, 0.18f), steelColor);
+                    }
+                }
+            }
 
             //    Vehicle   
             auto drawComponent = [&](auto& drawable, const glm::mat4& base, const glm::vec3& localPos, const glm::vec3& scale, const glm::vec3& color, glm::mat4 customRot = glm::mat4(1.0f)) {
