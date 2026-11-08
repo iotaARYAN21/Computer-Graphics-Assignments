@@ -13,19 +13,6 @@ Sriharikota (13.72° N, 80.23° E).
 
 Requirements: a C++17 compiler, CMake ≥ 3.10, OpenGL 3.3, GLEW and GLFW 3.
 
-On Ubuntu/Debian:
-
-```bash
-sudo apt install build-essential cmake libglew-dev libglfw3-dev
-```
-
-GLM is expected in `glm/` inside this folder (header-only; we used the
-1.1.0 development version, any 1.x release works). If it is missing:
-
-```bash
-git clone --depth 1 https://github.com/g-truc/glm.git glm
-```
-
 Build:
 
 ```bash
@@ -91,8 +78,8 @@ payload fairing and the Mangalyaan spacecraft.
 | Arrow keys, [ / ] | orbit and zoom camera |
 | B | separate strap-on boosters |
 | F | separate payload fairing (reveals Mangalyaan) |
-| S | sequential stage separation (after F) |
-| D | deploy Mangalyaan (after S) |
+| S | sequential stage separation (also releases the boosters) |
+| D | deploy Mangalyaan (also opens the fairing) |
 | Esc | exit |
 
 ### a3-scene: Integrated scene and animation
@@ -105,8 +92,8 @@ and `keyframes.txt` (see *Assignment 3* below).
 | P | start the animation (reloads both files) |
 | Space | pause / resume |
 | R | back to the first keyframe |
-| C | switch to the manual cameras and cycle them: Launch site → Vehicle → Planets → Earth view. P returns to the keyframed camera |
-| Arrow keys, [ / ] | orbit and zoom the manual camera |
+| C | switch to the manual cameras and cycle them: Launch site → Vehicle → Planets → Mars → Earth view. P returns to the keyframed camera |
+| Arrow keys, [ / ] | orbit and zoom the manual camera (switches to it from the keyframed camera) |
 | E | trajectory editor (below) |
 | Esc | exit |
 
@@ -117,6 +104,9 @@ and `keyframes.txt` (see *Assignment 3* below).
 - *Vehicle*: moves with the launch vehicle (Mangalyaan once separated).
 - *Planets*: from behind Earth towards Mars, so both are in view (Mars was
   about 98° away from India in the sky on launch day).
+- *Mars*: while Mangalyaan is in Mars orbit, follows it from the side away
+  from Mars, so Mars is behind it and its motion around Mars is easy to
+  see (`]` zooms out to the whole orbit). Before that, it shows Mars.
 
 **Lighting.** The Sun direction at launch time (RA 220.5°, Dec −15.7°,
 from the JPL approximate planetary elements) puts the Sun in the
@@ -300,7 +290,7 @@ moves the curve exactly, so the camera follows the spacecraft precisely.
 The cut between phases is a planned camera change.
 
 ## Use of Blender
-No component was modelled in Blender. All geometry (cylinders, cones, cubes,
+ All geometry (cylinders, cones, cubes,
 fairing halves, the Earth, Mars and Sun spheres) is generated in code under `src/models/`
 and `src/common/`.
 

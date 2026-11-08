@@ -28,7 +28,12 @@ using namespace std;
 const unsigned int WINDOW_WIDTH = 1000;
 const unsigned int WINDOW_HEIGHT = 700;
 
-float cameraYaw = 45.0f;
+// Afternoon Sun at the launch site (same direction as in a2-scene):
+// x = east, y = up, z = north; the Sun is in the south-west, ~40 deg high.
+// It is placed far away so it acts like a directional light.
+const glm::vec3 SUN_POSITION = glm::vec3(-0.638f, 0.636f, -0.434f) * 10000.0f;
+
+float cameraYaw = -150.0f; // sunlit (south-west) side, same as a2-scene
 float cameraPitch = 30.0f;
 float cameraDistance = 18.0f;
 
@@ -126,8 +131,9 @@ GLuint loadTexture(const char* path)
     glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0,
                  format, GL_UNSIGNED_BYTE, image);
     glGenerateMipmap(GL_TEXTURE_2D);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    // Mirrored repeat so neighbouring tiles join without visible seams.
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
@@ -159,7 +165,7 @@ void drawCube(Cube& cube, GLuint program, const glm::mat4& view,
     glUseProgram(program);
     setMatrices(program, model, view, projection);
 
-    glUniform3f(glGetUniformLocation(program, "lightPos"), 4.0f, 8.0f, 5.0f);
+    glUniform3fv(glGetUniformLocation(program, "lightPos"), 1, glm::value_ptr(SUN_POSITION));
     glUniform3fv(glGetUniformLocation(program, "objectColor"), 1, glm::value_ptr(color));
     cube.draw();
 }
@@ -198,8 +204,8 @@ void drawBeam(
 
     glUseProgram(program);
     setMatrices(program, model, view, projection);
-    glUniform3f(
-        glGetUniformLocation(program, "lightPos"), 4.0f, 8.0f, 5.0f);
+    glUniform3fv(
+        glGetUniformLocation(program, "lightPos"), 1, glm::value_ptr(SUN_POSITION));
     glUniform3fv(
         glGetUniformLocation(program, "objectColor"), 1, glm::value_ptr(color));
     cube.draw();
@@ -305,12 +311,17 @@ int main()
             glm::mat4 projection = glm::perspective(
                 glm::radians(45.0f),
                 static_cast<float>(width) / static_cast<float>(height),
-                0.1f, 100.0f);
+                0.1f, 1000.0f);
 
             // Large textured ground plane.
             glUseProgram(groundProgram);
-            glm::mat4 groundModel(1.0f);
+            // The plane is 20x20, so scale it up to reach the horizon in every
+            // camera view and repeat the texture once per original tile.
+            const float groundScale = 50.0f;
+            glm::mat4 groundModel = glm::scale(glm::mat4(1.0f), glm::vec3(groundScale, 1.0f, groundScale));
             setMatrices(groundProgram, groundModel, view, projection);
+            glUniform1f(glGetUniformLocation(groundProgram, "uvRepeat"), groundScale);
+            glUniform3fv(glGetUniformLocation(groundProgram, "lightPos"), 1, glm::value_ptr(SUN_POSITION));
             glUniform1i(glGetUniformLocation(groundProgram, "useTexture"),
                         groundTexture != 0);
             glUniform1i(glGetUniformLocation(groundProgram, "groundTexture"), 0);
@@ -322,7 +333,7 @@ int main()
             // Main concrete launch platform.
             drawCube(cube, cubeProgram, view, projection,
                      glm::vec3(0.0f, 0.18f, 0.0f),
-                     glm::vec3(6.0f, 0.36f, 5.0f),
+                     glm::vec3(6.0f, 0.36f, 6.5f), // deep enough for the service tower
                      glm::vec3(0.48f, 0.49f, 0.52f));
 
             // Raised central launch pedestal.
@@ -348,7 +359,7 @@ int main()
                     view,
                     projection,
                     towerPositions[i],
-                    glm::vec3(0.35f, 2.0f, 0.35f),
+                    glm::vec3(0.35f, 4.0f, 0.35f),
                     towerColor
                 );
             }
@@ -356,9 +367,9 @@ int main()
             // Service tower - structurally aligned frame
             glm::vec3 steelColor(0.65f, 0.68f, 0.72f);
             // Position and dimensions
-            float towerX = -4.2f;
-            float towerZ = -1.0f;
-            float towerHeight = 5.0f;
+            float towerX = 0.0f;
+            float towerZ = 2.0f; // north side, out of the flight path
+            float towerHeight = 11.0f;
             float towerWidth = 2.0f;
             float beamThickness = 0.10f;
             float bottomY = 0.36f; // Matched to the top of the launch platform
@@ -408,9 +419,9 @@ int main()
                 }
             }
             // Horizontal frames at the bottom, top, and three intermediate levels.
-            for (int level = 0; level <= 4; level++)
+            for (int level = 0; level <= 8; level++)
             {
-                float y = bottomY + towerHeight * level / 4.0f;
+                float y = bottomY + towerHeight * level / 8.0f;
                 // Front and back beams.
                 drawXBeam(y, towerZ - halfW, halfT);
                 drawXBeam(y, towerZ + halfW, halfT);
@@ -420,10 +431,10 @@ int main()
             }
             // Diagonal braces
             // Each brace is drawn as a rotated cube between two points.
-            for (int level = 0; level < 4; level++)
+            for (int level = 0; level < 8; level++)
             {
-                float y0 = bottomY + towerHeight * level / 4.0f;
-                float y1 = bottomY + towerHeight * (level + 1) / 4.0f;
+                float y0 = bottomY + towerHeight * level / 8.0f;
+                float y1 = bottomY + towerHeight * (level + 1) / 8.0f;
 
                 // Back face diagonals
                 glm::vec3 leftBottom(towerX - halfW, y0, towerZ - halfW);

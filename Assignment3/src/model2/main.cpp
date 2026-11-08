@@ -273,18 +273,14 @@ void drawRocket(Cylinder &cylinder,
                      glm::vec3(0.88f, 1.75f, 0.88f), white);
     }
 
-    // Upper/final stage and payload adapter remain attached to the satellite
-    // until the satellite deployment animation is triggered.
-    float upperStageDrop = stageDrop(5.4f);
-    if (upperStageDrop < 6.95f)
-    {
-        drawCylinder(cylinder, program, view, projection,
-                     glm::vec3(0.0f, 7.78f - upperStageDrop, 0.0f),
-                     glm::vec3(0.72f, 0.55f, 0.72f), dark);
-        drawCylinder(cylinder, program, view, projection,
-                     glm::vec3(0.0f, 8.18f - upperStageDrop, 0.0f),
-                     glm::vec3(0.62f, 0.28f, 0.62f), gold);
-    }
+    // Upper/final stage (PS4) and payload adapter always stay in place;
+    // Mangalyaan moves away from them when D is pressed.
+    drawCylinder(cylinder, program, view, projection,
+                 glm::vec3(0.0f, 7.78f, 0.0f),
+                 glm::vec3(0.72f, 0.55f, 0.72f), dark);
+    drawCylinder(cylinder, program, view, projection,
+                 glm::vec3(0.0f, 8.18f, 0.0f),
+                 glm::vec3(0.62f, 0.28f, 0.62f), gold);
 
     //       PAYLOAD FAIRING SEPARATION      
     float fairingProgress = 0.0f;
@@ -301,11 +297,12 @@ void drawRocket(Cylinder &cylinder,
     const glm::vec3 fairingPosition(0.0f, 9.05f, 0.0f);
     const glm::vec3 fairingScale(1.22f, 1.55f, 1.22f);
 
-    // Fairing halves are split along the Z axis in Fairing.cpp.
-    // Therefore, move them along Z rather than X; no extra rotation is needed.
+    // Fairing halves are split along the Z axis in Fairing.cpp: half A
+    // (index 0) is the +Z half and half B (index 1) is the -Z half, so each
+    // one moves outward on its own side.
     float separationDistance = 1.55f * fairingSmooth;
-    glm::vec3 fairingOffsetA(0.0f, 0.0f, -separationDistance);
-    glm::vec3 fairingOffsetB(0.0f, 0.0f,  separationDistance);
+    glm::vec3 fairingOffsetA(0.0f, 0.0f,  separationDistance);
+    glm::vec3 fairingOffsetB(0.0f, 0.0f, -separationDistance);
 
     glm::mat4 modelA(1.0f);
     modelA = glm::translate(modelA, fairingPosition + fairingOffsetA);
@@ -510,20 +507,29 @@ void processInput(GLFWwindow *window)
         fairingSeparationStartTime = glfwGetTime();
     }
 
-    // Start stage separation after the fairing has been released.
-    if (sDown && !sWasDown && fairingSeparationStarted &&
-        !stageSeparationStarted)
+    // Stage separation. The boosters are mounted on stage 1, so they are
+    // released too if B has not been pressed yet.
+    if (sDown && !sWasDown && !stageSeparationStarted)
     {
         stageSeparationStarted = true;
         stageSeparationStartTime = glfwGetTime();
+        if (!boosterSeparationStarted)
+        {
+            boosterSeparationStarted = true;
+            boosterSeparationStartTime = glfwGetTime();
+        }
     }
 
-    // Deploy Mangalyaan only after the fairing is open and stage sequence started.
-    if (dDown && !dWasDown && fairingSeparationStarted &&
-        stageSeparationStarted && !satelliteDeploymentStarted)
+    // Deploy Mangalyaan. The fairing is opened too if F has not been pressed.
+    if (dDown && !dWasDown && !satelliteDeploymentStarted)
     {
         satelliteDeploymentStarted = true;
         satelliteDeploymentStartTime = glfwGetTime();
+        if (!fairingSeparationStarted)
+        {
+            fairingSeparationStarted = true;
+            fairingSeparationStartTime = glfwGetTime();
+        }
     }
 
     bWasDown = bDown;
@@ -591,7 +597,7 @@ int main()
             << "  B: separate boosters\n"
             << "  F: separate payload fairing / reveal Mangalyaan\n"
             << "  S: start sequential stage separation\n"
-            << "  D: deploy Mangalyaan (after S)\n"
+            << "  D: deploy Mangalyaan\n"
             << "  Esc: exit\n";
 
         while (!glfwWindowShouldClose(window))

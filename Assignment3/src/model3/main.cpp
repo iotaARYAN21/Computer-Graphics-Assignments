@@ -3,6 +3,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/quaternion.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "../stb_image.h"
@@ -41,15 +43,16 @@ struct OrbitCamera
 };
 
 // 0 = Earth view (world units), 1 = launch site, 2 = vehicle (model units),
-// 3 = planets view (world units)
-const int CAMERA_COUNT = 4;
+// 3 = planets view (world units), 4 = Mars (world units)
+const int CAMERA_COUNT = 5;
 OrbitCamera cameras[CAMERA_COUNT] = {
     {0.0f, 0.0f, 90.0f, 33.0f, 650.0f, -89.0f},
-    {-150.0f, 8.0f, 32.0f, 8.0f, 2000.0f, 2.0f}, // sunlit (south-west) side
+    {150.0f, 8.0f, 32.0f, 8.0f, 2000.0f, 2.0f}, // sunlit (south-west) side
     {-150.0f, 10.0f, 22.0f, 5.0f, 300.0f, -80.0f},
     {25.0f, 0.0f, 165.0f, 60.0f, 700.0f, -80.0f}, // behind Earth, Mars beyond
+    {0.0f, 20.0f, 6.0f, 1.0f, 700.0f, -89.0f},     // Mars: follows Mangalyaan in Mars orbit
 };
-const char* CAMERA_NAMES[CAMERA_COUNT] = {"Earth view", "Launch site", "Vehicle", "Planets (Earth + Mars)"};
+const char* CAMERA_NAMES[CAMERA_COUNT] = {"Earth view", "Launch site", "Vehicle", "Planets (Earth + Mars)", "Mars"};
 int cameraMode = 1;
 
 //       
@@ -246,7 +249,12 @@ void processInput(GLFWwindow* window, float deltaTime) {
         // Editor camera: arrows orbit, Shift+arrows pan, PgUp/PgDn depth, [ ] zoom.
         editor.updateMovement(window, deltaTime);
     } else {
-        // Camera orbit and zoom for the active scene camera.
+        // Camera orbit and zoom for the active scene camera. Using them while
+        // the keyframed camera is shown switches to the manual camera
+        // (P goes back to the keyframed one).
+        for (int key : {GLFW_KEY_LEFT, GLFW_KEY_RIGHT, GLFW_KEY_UP, GLFW_KEY_DOWN,
+                        GLFW_KEY_LEFT_BRACKET, GLFW_KEY_RIGHT_BRACKET})
+            if (glfwGetKey(window, key) == GLFW_PRESS) userCamera = true;
         OrbitCamera& cam = cameras[cameraMode];
         const float angleSpeed = 60.0f * deltaTime;
         const float zoomFactor = 1.0f + 1.5f * deltaTime;
@@ -373,7 +381,7 @@ int main() {
              << "\n  P        : start the animation (reloads trajectory.txt and keyframes.txt)"
              << "\n  Space    : pause / resume"
              << "\n  R        : back to the first keyframe"
-             << "\n  C        : manual cameras (Earth view / Launch site / Vehicle / Planets); P returns to the keyframed camera"
+             << "\n  C        : manual cameras (Earth view / Launch site / Vehicle / Planets / Mars); P returns to the keyframed camera"
              << "\n  Arrows   : orbit the manual camera,  [ and ] : zoom"
              << "\n  Esc      : exit"
              << "\n"
@@ -519,20 +527,48 @@ int main() {
             } else if (cameraMode == 1) {
                 // Launch-site camera: fixed near the pad, tracks the vehicle.
                 float d = cam.distance * ROCKET_SCALE;
-                glm::vec3 offset = siteRight * (d * orbit.x) + siteUp * (d * orbit.y) + siteForward * (d * orbit.z);
+                // The site frame (east, up, north) is left-handed, so east is
+                // negated here; otherwise Left/Right would orbit the opposite
+                // way to the other cameras.
+                glm::vec3 offset = -siteRight * (d * orbit.x) + siteUp * (d * orbit.y) + siteForward * (d * orbit.z);
                 cameraPos = sitePos + offset;
                 glm::vec3 target = payloadSeparated ? worldSatPos : rocketCentre;
                 view = glm::lookAt(cameraPos, target, siteUp);
             } else if (cameraMode == 3) {
                 // Planets view: from just behind Earth (on the side away from
                 // Mars), looking out towards Mars so both are in the frame.
-                // The orbit angles are measured around that line.
+                // The camera orbits around the point it looks at (between
+                // Earth and Mars), so turning left/right always rotates the
+                // view in the same direction. cam.distance is the distance
+                // behind Earth's centre in the default view.
                 glm::vec3 towardMars = surfaceDirection(MARS_LATITUDE, MARS_LONGITUDE);
                 glm::vec3 right = glm::normalize(glm::cross(towardMars, glm::vec3(0.0f, 1.0f, 0.0f)));
                 glm::vec3 up = glm::cross(right, towardMars);
-                cameraPos = (right * orbit.x + up * orbit.y - towardMars * orbit.z) * cam.distance;
-                view = glm::lookAt(cameraPos, towardMars * (0.3f * MARS_DISTANCE), up);
+                float targetDistance = 0.3f * MARS_DISTANCE;
+                glm::vec3 target = towardMars * targetDistance;
+                float radius = cam.distance + targetDistance;
+                cameraPos = target + (right * orbit.x + up * orbit.y - towardMars * orbit.z) * radius;
+                view = glm::lookAt(cameraPos, target, up);
                 nearPlane = 0.5f;
+            } else if (cameraMode == 4) {
+                // Mars camera. While Mangalyaan is in Mars orbit the camera
+                // follows it from the side away from Mars, so Mars fills the
+                // background and the motion around Mars is easy to see. The
+                // orbit angles are measured around that "away from Mars" line.
+                // Before Mangalyaan arrives it shows Mars from outside the orbit.
+                glm::vec3 marsCentre = surfaceDirection(MARS_LATITUDE, MARS_LONGITUDE) * MARS_DISTANCE;
+                if (spacePath == TRAJ_MARS_ORBIT) {
+                    glm::vec3 back = glm::normalize(worldSatPos - marsCentre);
+                    glm::vec3 right = glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), back));
+                    glm::vec3 up = glm::cross(back, right);
+                    cameraPos = worldSatPos + (right * orbit.x + up * orbit.y + back * orbit.z) * cam.distance;
+                    view = glm::lookAt(cameraPos, worldSatPos, up);
+                    nearPlane = 0.05f;
+                } else {
+                    cameraPos = marsCentre + orbit * (cam.distance + 150.0f);
+                    view = glm::lookAt(cameraPos, marsCentre, glm::vec3(0.0f, 1.0f, 0.0f));
+                    nearPlane = 0.5f;
+                }
             } else {
                 // Vehicle camera: moves with the launch vehicle (then the payload).
                 glm::vec3 target = payloadSeparated ? worldSatPos : rocketCentre;
@@ -625,6 +661,8 @@ int main() {
             glDepthMask(GL_FALSE);
             setMatrices(atmosphereProgram, glm::scale(earthModel, glm::vec3(1.03f)), view, projection);
             glUniform3fv(glGetUniformLocation(atmosphereProgram, "cameraPos"), 1, glm::value_ptr(cameraPos));
+            glUniform1f(glGetUniformLocation(atmosphereProgram, "earthRadius"), EARTH_RADIUS);
+            glUniform1f(glGetUniformLocation(atmosphereProgram, "shellRadius"), 1.03f * EARTH_RADIUS);
             earthMesh->draw();
             glDepthMask(GL_TRUE);
 
@@ -653,11 +691,103 @@ int main() {
             glBindTexture(GL_TEXTURE_2D, 0);
 
             glm::mat4 padBase = glm::translate(siteModel, glm::vec3(0.0f, 0.23f, 0.0f));
-            padBase = glm::scale(padBase, glm::vec3(6.0f, 0.36f, 5.0f));
+            padBase = glm::scale(padBase, glm::vec3(6.0f, 0.36f, 6.5f)); // deep enough for the service tower
             setMatrices(rocketProgram, padBase, view, projection);
             glUniform3fv(glGetUniformLocation(rocketProgram, "lightPos"), 1, glm::value_ptr(lightPos));
             glUniform3f(glGetUniformLocation(rocketProgram, "objectColor"), 0.48f, 0.49f, 0.52f);
             cube.draw();
+
+            //    Launch-site structures (same as a2-model-1)
+            // Positions are the a2-model-1 values shifted up by the 0.05
+            // ground offset used in this scene.
+            {
+                const float GROUND_Y = 0.05f;
+                auto drawSiteBox = [&](glm::vec3 pos, const glm::vec3& scale, const glm::vec3& color) {
+                    pos.y += GROUND_Y;
+                    glm::mat4 m = glm::translate(siteModel, pos);
+                    m = glm::scale(m, scale);
+                    setMatrices(rocketProgram, m, view, projection);
+                    glUniform3fv(glGetUniformLocation(rocketProgram, "lightPos"), 1, glm::value_ptr(lightPos));
+                    glUniform3fv(glGetUniformLocation(rocketProgram, "objectColor"), 1, glm::value_ptr(color));
+                    cube.draw();
+                };
+                auto drawSiteBeam = [&](glm::vec3 start, glm::vec3 end, float thickness, const glm::vec3& color) {
+                    glm::vec3 dir = end - start;
+                    float length = glm::length(dir);
+                    if (length < 0.0001f) return;
+                    glm::vec3 mid = (start + end) * 0.5f;
+                    mid.y += GROUND_Y;
+                    glm::mat4 m = glm::translate(siteModel, mid);
+                    m *= glm::mat4_cast(glm::rotation(glm::vec3(0.0f, 1.0f, 0.0f), dir / length));
+                    m = glm::scale(m, glm::vec3(thickness, length, thickness));
+                    setMatrices(rocketProgram, m, view, projection);
+                    glUniform3fv(glGetUniformLocation(rocketProgram, "lightPos"), 1, glm::value_ptr(lightPos));
+                    glUniform3fv(glGetUniformLocation(rocketProgram, "objectColor"), 1, glm::value_ptr(color));
+                    cube.draw();
+                };
+
+                // Raised central launch pedestal.
+                drawSiteBox(glm::vec3(0.0f, 0.52f, 0.0f), glm::vec3(2.0f, 0.35f, 2.0f), glm::vec3(0.68f, 0.69f, 0.71f));
+
+                // Simplified launch-site towers.
+                const glm::vec3 towerColor(1.0f, 0.65f, 0.0f);
+                const glm::vec3 towerPositions[] = {
+                    glm::vec3(-4.5f, 2.0f, -3.5f), glm::vec3(4.5f, 2.0f, -3.5f),
+                    glm::vec3(-4.5f, 2.0f, 3.5f), glm::vec3(4.5f, 2.0f, 3.5f)};
+                for (const glm::vec3& p : towerPositions)
+                    drawSiteBox(p, glm::vec3(0.35f, 4.0f, 0.35f), towerColor);
+
+                // Service tower: columns, horizontal frames and diagonal braces.
+                const glm::vec3 steelColor(0.65f, 0.68f, 0.72f);
+                const float towerX = 0.0f, towerZ = 2.0f; // north side: out of the flight path (launch azimuth 104 deg) and the Sun (south-west)
+                const float towerHeight = 11.0f, towerWidth = 2.0f, beamThickness = 0.10f;
+                const float bottomY = 0.36f;
+                const float halfW = towerWidth * 0.5f, halfT = beamThickness * 0.5f, halfH = towerHeight * 0.5f;
+
+                for (int xSide = -1; xSide <= 1; xSide += 2)
+                    for (int zSide = -1; zSide <= 1; zSide += 2)
+                        drawSiteBox(glm::vec3(towerX + xSide * (halfW - halfT), bottomY + halfH, towerZ + zSide * (halfW - halfT)),
+                                    glm::vec3(beamThickness, towerHeight, beamThickness), steelColor);
+
+                for (int level = 0; level <= 8; level++) {
+                    float y = bottomY + towerHeight * level / 8.0f;
+                    drawSiteBox(glm::vec3(towerX, y, towerZ - halfW), glm::vec3(towerWidth, halfT, halfT), steelColor);
+                    drawSiteBox(glm::vec3(towerX, y, towerZ + halfW), glm::vec3(towerWidth, halfT, halfT), steelColor);
+                    drawSiteBox(glm::vec3(towerX - halfW, y, towerZ), glm::vec3(halfT, halfT, towerWidth), steelColor);
+                    drawSiteBox(glm::vec3(towerX + halfW, y, towerZ), glm::vec3(halfT, halfT, towerWidth), steelColor);
+                }
+
+                for (int level = 0; level < 8; level++) {
+                    float y0 = bottomY + towerHeight * level / 8.0f;
+                    float y1 = bottomY + towerHeight * (level + 1) / 8.0f;
+                    // Back and front faces.
+                    for (float z : {towerZ - halfW, towerZ + halfW}) {
+                        drawSiteBeam(glm::vec3(towerX - halfW, y0, z), glm::vec3(towerX + halfW, y1, z), 0.07f, steelColor);
+                        drawSiteBeam(glm::vec3(towerX + halfW, y0, z), glm::vec3(towerX - halfW, y1, z), 0.07f, steelColor);
+                    }
+                    // Left and right faces.
+                    for (float x : {towerX - halfW, towerX + halfW}) {
+                        drawSiteBeam(glm::vec3(x, y0, towerZ - halfW), glm::vec3(x, y1, towerZ + halfW), 0.07f, steelColor);
+                        drawSiteBeam(glm::vec3(x, y0, towerZ + halfW), glm::vec3(x, y1, towerZ - halfW), 0.07f, steelColor);
+                    }
+                }
+
+                // Umbilical arms from the tower to the vehicle, removed once the
+                // vehicle leaves the pad. Heights are along the rocket (from its
+                // base); radius is the rocket's radius there (PS1, PS2, PS3, PS4).
+                glm::vec3 padVehiclePos = sitePos + siteUp * (PAD_TOP * ROCKET_SCALE);
+                if (glm::length(vehiclePos - padVehiclePos) < 0.01f * ROCKET_SCALE) {
+                    const float rocketBase = PAD_TOP - GROUND_Y;
+                    const float armHeights[] = {3.0f, 4.9f, 6.9f, 7.9f};
+                    const float armRadius[] = {0.725f, 0.56f, 0.44f, 0.36f};
+                    float towerInner = towerZ - halfW;
+                    for (int i = 0; i < 4; ++i) {
+                        float length = towerInner - armRadius[i];
+                        drawSiteBox(glm::vec3(towerX, rocketBase + armHeights[i], towerInner - 0.5f * length),
+                                    glm::vec3(0.18f, 0.12f, length), steelColor);
+                    }
+                }
+            }
 
             // ---------------- Vehicle ----------------
             auto drawComponent = [&](auto& drawable, const glm::mat4& base, const glm::vec3& localPos, const glm::vec3& scale, const glm::vec3& color, glm::mat4 customRot = glm::mat4(1.0f)) {

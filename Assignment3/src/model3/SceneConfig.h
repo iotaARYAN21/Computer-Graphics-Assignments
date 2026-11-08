@@ -19,7 +19,7 @@ const float EARTH_RADIUS = 30.0f;
 const float KM_TO_WORLD = EARTH_RADIUS / static_cast<float>(EARTH_RADIUS_KM);
 const float ROCKET_SCALE = 0.003f;                 // model units -> world units
 const float MODEL_UNITS_PER_METRE = 9.83f / 44.4f; // model height / real height
-const float PAD_TOP = 0.41f;                       // pad height in model units
+const float PAD_TOP = 0.745f;                      // top of the launch pedestal in model units
 
 // Separated parts are placed relative to the vehicle with the same
 // magnification as the vehicle, so separations look right next to it.
