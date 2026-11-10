@@ -201,6 +201,14 @@ glm::vec3 cameraPos(0.0f, 0.0f, 4.0f);
 const float MIN_CAMERA_RADIUS = 1.015f; // just above the surface
 const float MAX_CAMERA_RADIUS = 50.0f;
 
+// processInput: the only "animation" in model 0.
+//   - Arrow keys / [ ] move the camera (translation only).
+//     Speed = 1.5 * altitude * deltaTime, so you move slower near Earth.
+//     glm::max(altitude, 0.02) makes sure speed never becomes 0.
+//   - Camera is kept between MIN and MAX radius by rescaling the vector.
+//   - A / D change earthRotation (degrees). main() turns it into
+//     glm::rotate(identity, radians(earthRotation), Y axis) = Earth spins.
+//   Multiplying by deltaTime = same speed per second on any computer.
 void processInput(GLFWwindow* window, float deltaTime, float& earthRotation)
 {
     const float rotationSpeed = 70.0f * deltaTime;

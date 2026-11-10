@@ -119,6 +119,25 @@ double lastTrailTime = -1.0;
 vector<float> earthVertices;
 vector<unsigned int> earthIndices;
 
+// =====================================================================
+// HOW ANIMATION WORKS IN THIS FILE (a2-scene)
+// =====================================================================
+// Every frame in main():
+//   1. deltaTime = real seconds since last frame
+//   2. flight.update(deltaTime * warp)  -> physics moves everything
+//      (see Flight.cpp). warp = time speed-up (1x..50x).
+//   3. Earth rotation angle = speed * missionTime  -> Earth spins
+//   4. Rocket model matrix = earth rotation * (rocket rotation + position)
+//      * scale  -> rocket placed where the physics says
+//   5. Stages still attached are drawn on the rocket; dropped stages are
+//      drawn at their own Debris position with small extra spins
+//      (boosters tumble, fairing halves swing open)
+//   6. Mangalyaan grows and turns after release (clamp + smoothstep)
+//   7. Exhaust flame flickers using sin() of the clock
+//   8. A trail line records the rocket's position every 2 s
+// =====================================================================
+
+// readFile: returns a whole text file (shader source) as a string.
 string readFile(const string& path) {
     ifstream file(path);
     if (!file) throw runtime_error("Cannot open shader file: " + path);
@@ -127,6 +146,7 @@ string readFile(const string& path) {
     return buffer.str();
 }
 
+// compileShader: compiles one shader on the GPU, throws on error.
 GLuint compileShader(GLenum type, const string& source) {
     GLuint shader = glCreateShader(type);
     const char* src = source.c_str();
@@ -144,6 +164,7 @@ GLuint compileShader(GLenum type, const string& source) {
     return shader;
 }
 
+// createProgram: links a vertex + fragment shader into a usable program.
 GLuint createProgram(const string& vertexPath, const string& fragmentPath) {
     GLuint vs = compileShader(GL_VERTEX_SHADER, readFile(vertexPath));
     GLuint fs = compileShader(GL_FRAGMENT_SHADER, readFile(fragmentPath));
@@ -179,6 +200,9 @@ GLuint loadTexture(const char* path, bool repeat) {
     return texture;
 }
 
+// generateSphere: builds the vertices (position, normal, texture coord)
+// and triangle indices of a sphere, used for Earth, Mars and the Sun.
+// Not animation; the sphere is made once and then rotated with a matrix.
 void generateSphere(float radius, int stacks, int sectors) {
     earthVertices.clear();
     earthIndices.clear();
@@ -205,6 +229,8 @@ void generateSphere(float radius, int stacks, int sectors) {
     }
 }
 
+// setMatrices: sends model / view / projection matrices to the shader.
+// The "model" matrix is what changes every frame to animate an object.
 void setMatrices(GLuint program, const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection) {
     glUseProgram(program);
     glUniformMatrix4fv(glGetUniformLocation(program, "model"), 1, GL_FALSE, glm::value_ptr(model));
@@ -222,6 +248,9 @@ glm::vec3 surfaceDirection(float lat, float lon) {
 }
 
 // Local frame on the surface: x = east, y = up, z = north.
+// getSurfaceTransform: returns a matrix that places an object standing
+// upright on Earth's surface at (lat, lon). Columns 0,1,2 are the
+// rotation axes, column 3 is the position (up * radius).
 glm::mat4 getSurfaceTransform(float lat, float lon, float radius) {
     glm::vec3 up = surfaceDirection(lat, lon);
     glm::vec3 right = glm::normalize(glm::cross(glm::vec3(0, 1, 0), up));
@@ -235,11 +264,17 @@ glm::mat4 getSurfaceTransform(float lat, float lon, float radius) {
     return transform;
 }
 
+// smoothStep: returns 0 when x <= edge0, 1 when x >= edge1, and a smooth
+// S-shaped curve in between. Example smoothStep(30, 120, altitude):
+// 0 below 30 km, 1 above 120 km, gradually changing between.
+// Used to fade the blue sky and widen the exhaust plume with height.
 float smoothStep(float edge0, float edge1, float x) {
     float t = glm::clamp((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
     return t * t * (3.0f - 2.0f * t);
 }
 
+// resetMission: R key. Puts the rocket back on the pad (flight.reset),
+// clears the trail line and points the Earth-view camera at India.
 void resetMission() {
     flight.reset(glm::dvec3(surfaceDirection(SITE_LATITUDE, SITE_LONGITUDE)), LAUNCH_AZIMUTH);
     trail.clear();
@@ -251,6 +286,12 @@ void resetMission() {
     cameras[0].yaw = glm::degrees(atan2(d.x, d.z));
 }
 
+// processInput: keyboard handling.
+//   Arrows / [ ] move the current camera. Speeds are multiplied by
+//   deltaTime so the camera moves the same per SECOND on any computer.
+//   glm::min / glm::max keep pitch and distance inside allowed limits.
+//   L = launch, C = next camera, R = reset, + / - = time warp.
+//   "pressed()" only returns true on the first frame a key goes down.
 void processInput(GLFWwindow* window, float deltaTime) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) glfwSetWindowShouldClose(window, true);
 
@@ -281,6 +322,7 @@ void processInput(GLFWwindow* window, float deltaTime) {
     if (pressed(GLFW_KEY_MINUS) || pressed(GLFW_KEY_KP_SUBTRACT)) warpIndex = glm::max(warpIndex - 1, 0);
 }
 
+// phaseName: text for the window title ("PS2", "coast", ...).
 const char* phaseName() {
     if (!flight.launched) return "on pad";
     switch (flight.phase) {
@@ -293,6 +335,8 @@ const char* phaseName() {
     }
 }
 
+// main: setup, then the render loop. See the overview comment at the top
+// of this file for what happens each frame.
 int main() {
     if (!glfwInit()) return -1;
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -394,6 +438,8 @@ int main() {
             //    World transforms   
             // Earth turns at its real rate (times the warp) during the mission;
             // at T+0 the Earth-fixed frame equals the world frame.
+            // Earth spin: angle = (degrees per second) * (seconds since launch).
+            // glm::rotate around (0,1,0) = spin around the north-south axis.
             float earthRot = EARTH_ROTATION_DEG_PER_S * static_cast<float>(flight.missionTime);
             glm::mat4 earthModel = glm::rotate(glm::mat4(1.0f), glm::radians(earthRot), glm::vec3(0, 1, 0));
 
@@ -408,12 +454,20 @@ int main() {
             glm::vec3 siteUpFixed = surfaceDirection(SITE_LATITUDE, SITE_LONGITUDE);
             glm::vec3 vehiclePosFixed = glm::vec3(flight.vehicle.pos) * KM_TO_WORLD + siteUpFixed * (PAD_TOP * ROCKET_SCALE);
 
+            // placeFrame: builds a model matrix for the rocket or a debris part.
+            //   glm::mat4(frame) -> rotation (from Flight's frame)
+            //   m[3] = position   -> put the translation in the 4th column
+            //   earthModel * ...  -> also turn with the rotating Earth
+            //   * scale           -> make the model the right size
             auto placeFrame = [&](const glm::vec3& posFixed, const glm::mat3& frame) {
                 glm::mat4 m(frame);
                 m[3] = glm::vec4(posFixed, 1.0f);
                 return earthModel * m * glm::scale(glm::mat4(1.0f), glm::vec3(ROCKET_SCALE));
             };
             // Separated bodies: offset from the vehicle, magnified like the vehicle.
+            // separatedPos: the rocket is drawn ~140x bigger than real, so the
+            // real gap between rocket and debris would look tiny. We take the
+            // gap (body.pos - vehicle.pos) and magnify it the same way.
             auto separatedPos = [&](const Body& body) {
                 glm::vec3 offset = glm::vec3(body.pos - flight.vehicle.pos);
                 return vehiclePosFixed + offset * SEPARATION_TO_WORLD;
@@ -494,6 +548,7 @@ int main() {
             float cameraAltKm = (glm::length(cameraPos) - EARTH_RADIUS) / KM_TO_WORLD;
             float daylight = smoothStep(-0.05f, 0.2f, glm::dot(glm::normalize(cameraPos), sunDir));
             float skyAmount = (1.0f - smoothStep(0.0f, 60.0f, cameraAltKm)) * daylight;
+            // glm::mix(a, b, t) = a + (b - a) * t : t=0 gives black, t=1 gives blue.
             glm::vec3 skyColour = glm::mix(glm::vec3(0.0f, 0.0f, 0.01f), glm::vec3(0.42f, 0.62f, 0.88f), skyAmount);
             glClearColor(skyColour.r, skyColour.g, skyColour.b, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -670,7 +725,14 @@ int main() {
                 }
             }
 
-            //    Vehicle   
+            //    Vehicle
+            // drawComponent: draws one mesh relative to a "base" matrix
+            // (the rocket's or a debris part's matrix).
+            //   translate(base, localPos) -> where the part sits on the rocket
+            //   *= customRot              -> optional extra spin (tumbling etc.)
+            //   scale                     -> the part's size
+            // Because "base" moves every frame, all parts drawn on it move too
+            // (parent -> child transform, like a scene graph).
             auto drawComponent = [&](auto& drawable, const glm::mat4& base, const glm::vec3& localPos, const glm::vec3& scale, const glm::vec3& color, glm::mat4 customRot = glm::mat4(1.0f)) {
                 glm::mat4 model = glm::translate(base, localPos);
                 model *= customRot;
@@ -686,6 +748,9 @@ int main() {
             const glm::vec3 dark(0.22f, 0.24f, 0.28f);
             const glm::vec3 gold(0.82f, 0.63f, 0.18f);
 
+            // drawBooster / drawStage1/2/3: draw a part on any base matrix.
+            // The SAME function is used while the part is attached (base =
+            // rocketTransform) and after it separates (base = its debris matrix).
             auto drawBooster = [&](const glm::mat4& base, int i, glm::mat4 rot) {
                 float a = glm::radians(45.0f + 90.0f * i);
                 glm::vec3 pos(0.92f * cos(a), 1.85f, 0.92f * sin(a));
@@ -707,6 +772,8 @@ int main() {
             const glm::vec3 fairingScale(1.22f, 1.55f, 1.22f);
             const glm::vec3 fairingBasePos(0.0f, 9.05f, 0.0f);
 
+            // Phases are in order, so "phase <= PHASE_PS2" means "stage 2 has
+            // not been dropped yet" -> still draw it on the rocket.
             Phase phase = flight.phase;
             if (phase == PHASE_PS1_STRAPONS)
                 for (int i = 0; i < 4; ++i) drawBooster(rocketTransform, i, glm::mat4(1.0f));
@@ -723,7 +790,13 @@ int main() {
                 drawComponent(fairingB, rocketTransform, fairingBasePos, fairingScale, white);
             }
 
-            //    Separated parts   
+            //    Separated parts
+            // For each dropped part: get its position from the physics, skip it
+            // if it is far away, build its matrix, and add a small extra
+            // rotation that grows with t (seconds since it separated):
+            //   boosters : tumble 12 deg per second, outward
+            //   fairings : swing open 25 deg per second around their bottom
+            //              edge (move to hinge, rotate, move back up)
             for (const Debris& d : flight.debris) {
                 if (!d.active) continue;
                 glm::vec3 posFixed = separatedPos(d.body);
@@ -759,6 +832,10 @@ int main() {
             }
 
             //    Mangalyaan   
+            // After release: dProg goes 0 -> 1 over 3 mission seconds
+            // (clamp stops it at 1), smoothed, then used to grow the satellite
+            // from 35% to 100% size and turn it 45 deg around its Y axis.
+            // Its position comes from the physics (satelliteBase).
             if (flight.fairingSeparated) {
                 float dProg = 0.0f;
                 if (flight.satelliteReleased)
@@ -785,9 +862,14 @@ int main() {
 
                 float expansion = 1.0f + 1.2f * smoothStep(30.0f, 120.0f, altitude);
                 float t = static_cast<float>(glfwGetTime());
+                // Flicker: sin() swings between -1 and +1, so this length factor
+                // wobbles around 1.0 by up to +-10%. Two different speeds (40 and
+                // 97) mixed together look irregular, like a real flame.
                 float flicker = 1.0f + 0.06f * sin(40.0f * t) + 0.04f * sin(97.0f * t);
                 glm::mat4 flip = glm::rotate(glm::mat4(1.0f), PI, glm::vec3(1, 0, 0));
 
+                // drawPlume: two upside-down cones (flip = rotate 180 deg) under a
+                // nozzle: a wide orange outer flame and a thinner yellow core.
                 auto drawPlume = [&](const glm::vec3& nozzle, float diameter, float length) {
                     float w = diameter * expansion;
                     float l = length * flicker * (1.0f + 0.4f * (expansion - 1.0f));

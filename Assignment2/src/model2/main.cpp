@@ -20,12 +20,42 @@
 
 using namespace std;
 
+// =====================================================================
+// HOW ANIMATION WORKS IN THIS FILE (a2-model-2)  -- read this first
+// =====================================================================
+// Nothing here is "moved" step by step. Instead, EVERY FRAME we:
+//   1. ask "how many seconds since the user pressed the key?"
+//        elapsed = glfwGetTime() - startTime
+//   2. turn that into a progress number between 0 and 1
+//        progress = clamp(elapsed / duration, 0, 1)
+//        (0 = animation not started, 1 = animation finished)
+//   3. make it smooth (slow start, slow end) with the "smoothstep" curve
+//        smooth = p * p * (3 - 2p)
+//   4. use that number to compute WHERE the part should be right now
+//        position = startPosition + direction * distance * smooth
+//   5. draw the part at that position using a model matrix
+//        (glm::translate / glm::rotate / glm::scale)
+//
+// Because the position is recomputed from time every frame, the
+// animation runs at the same speed on a fast or slow computer.
+//
+// Each animation (boosters, fairing, stages, satellite) just needs two
+// global variables: "has it started?" and "when did it start?".
+// =====================================================================
+
 const int WINDOW_WIDTH = 1000;
 const int WINDOW_HEIGHT = 800;
 
+// Orbit camera: yaw = angle around the rocket (left/right),
+// pitch = angle up/down, distance = how far away the camera is.
 float cameraYaw = 35.0f;
 float cameraPitch = 18.0f;
 float cameraDistance = 18.0f;
+
+// For every animation we store:
+//   xxxStarted   -> false until the key is pressed
+//   xxxStartTime -> the clock time (glfwGetTime()) at the moment of the key press
+// Later, (now - startTime) tells us how far into the animation we are.
 
 // Booster separation animation.
 bool boosterSeparationStarted = false;
@@ -42,6 +72,8 @@ double stageSeparationStartTime = 0.0;
 bool satelliteDeploymentStarted = false;
 double satelliteDeploymentStartTime = 0.0;
 
+// readFile: opens a text file (a shader .glsl file) and returns its
+// whole content as one string. Not animation related, just setup.
 string readFile(const string &path)
 {
     ifstream file(path);
@@ -53,6 +85,8 @@ string readFile(const string &path)
     return buffer.str();
 }
 
+// compileShader: gives the shader source code to the GPU driver and
+// compiles it. Prints the error log and throws if there is a mistake.
 GLuint compileShader(GLenum type, const string &source)
 {
     GLuint shader = glCreateShader(type);
@@ -74,6 +108,8 @@ GLuint compileShader(GLenum type, const string &source)
     return shader;
 }
 
+// createProgram: compiles a vertex shader + fragment shader and links
+// them into one "program" that we use when drawing.
 GLuint createProgram(const string &vertexPath, const string &fragmentPath)
 {
     GLuint vs = compileShader(GL_VERTEX_SHADER, readFile(vertexPath));
@@ -102,6 +138,12 @@ GLuint createProgram(const string &vertexPath, const string &fragmentPath)
     return program;
 }
 
+// setMatrices: sends the three matrices to the shader.
+//   model      -> WHERE the object is, how it is rotated and how big it is.
+//                 *** This is the matrix that animation changes. ***
+//   view       -> where the camera is and where it looks.
+//   projection -> perspective (far things look smaller).
+// The shader then computes: screenPos = projection * view * model * vertex
 void setMatrices(GLuint program, const glm::mat4 &model,
                  const glm::mat4 &view, const glm::mat4 &projection)
 {
@@ -114,6 +156,14 @@ void setMatrices(GLuint program, const glm::mat4 &model,
                        1, GL_FALSE, glm::value_ptr(projection));
 }
 
+// drawCylinder: draws one cylinder (or cone) at "position" with size "scale".
+// To ANIMATE a part we simply call this every frame with a different
+// position (e.g. position.y - drop moves the part down).
+//   glm::mat4(1.0f)      -> identity matrix = "no change at all"
+//   glm::translate(m, p) -> move by p
+//   glm::scale(m, s)     -> stretch by s along x, y, z
+// Order matters: the last one written (scale) is applied to the
+// vertices first, so the object is resized first and then moved.
 void drawCylinder(Cylinder &cylinder, GLuint program,
                   const glm::mat4 &view, const glm::mat4 &projection,
                   const glm::vec3 &position, const glm::vec3 &scale,
@@ -130,6 +180,11 @@ void drawCylinder(Cylinder &cylinder, GLuint program,
     cylinder.draw();
 }
 
+// drawRotatedCylinder: same as drawCylinder but also rotates the object.
+//   glm::rotate(m, angleInRadians, axis) -> spin around "axis".
+//   glm::radians(deg) converts degrees to radians (GLM wants radians).
+// Final effect on a vertex: scale -> rotate -> move to position.
+// (Currently not called anywhere, kept as a helper.)
 void drawRotatedCylinder(
     Cylinder &cylinder,
     GLuint program,
@@ -166,6 +221,14 @@ void drawRotatedCylinder(
     cylinder.draw();
 }
 
+// drawRocket: draws the WHOLE vehicle once. Called every frame from main().
+// This is where all four animations of model 2 are calculated:
+//   - stage separation   (S key) -> stages slide down one after another
+//   - fairing separation (F key) -> two nose-cone halves slide apart
+//   - booster separation (B key) -> 4 boosters move outward and down
+//   - satellite deploy   (D key) -> Mangalyaan slides sideways and grows
+// Each one follows the same recipe: time -> progress (0..1) ->
+// smooth progress -> offset -> draw at (original position + offset).
 void drawRocket(Cylinder &cylinder,
                 Cylinder &cone,
                 Fairing &fairingHalfA,
@@ -218,10 +281,21 @@ void drawRocket(Cylinder &cylinder,
     // Press S to start a simple sequential stage-separation animation.
     // Each spent lower stage moves downward and fades out of the scene
 
+    // stageElapsed = seconds since S was pressed (0 if not pressed yet).
+    // glfwGetTime() = seconds since the program started (a stopwatch).
     float stageElapsed = stageSeparationStarted
         ? static_cast<float>(glfwGetTime() - stageSeparationStartTime)
         : 0.0f;
 
+    // stageDrop(delay): how far DOWN (in model units) a stage has fallen.
+    // "delay" lets stages fall one after another:
+    //   stage 1 starts at 0 s, stage 2 at 1.8 s, stage 3 at 3.6 s.
+    // Steps:
+    //   (stageElapsed - delay) / 1.8  -> 0 at start, 1 after 1.8 seconds
+    //   glm::clamp(..., 0, 1)         -> never below 0 or above 1, so the
+    //                                    stage stops after falling fully
+    //   p*p*(3-2p)                    -> smoothstep: slow-fast-slow motion
+    //   7 * p                         -> total fall distance is 7 units
     auto stageDrop = [&](float delay)
     {
         if (!stageSeparationStarted || stageElapsed <= delay)
@@ -231,6 +305,10 @@ void drawRocket(Cylinder &cylinder,
         p = p * p * (3.0f - 2.0f * p);
         return 7.0f * p;
     };
+
+    // For each stage: subtract the drop from its Y position (moves it
+    // down). When it has nearly fallen the full 7 units we stop drawing
+    // it, so it "disappears" from the scene.
 
     // Stage 1 (white lower body) and its interstage ring.
     // It starts moving after the S sequence begins.
@@ -281,7 +359,10 @@ void drawRocket(Cylinder &cylinder,
                  glm::vec3(0.0f, 8.18f, 0.0f),
                  glm::vec3(0.62f, 0.28f, 0.62f), gold);
 
-    //   PAYLOAD FAIRING SEPARATION  
+    //   PAYLOAD FAIRING SEPARATION
+    // Same recipe: progress goes 0 -> 1 in 2 seconds after F is pressed,
+    // gets smoothed, and the two halves are pushed apart along Z
+    // (half A towards +Z, half B towards -Z) by up to 1.55 units.
     float fairingProgress = 0.0f;
     if (fairingSeparationStarted)
     {
@@ -341,6 +422,10 @@ void drawRocket(Cylinder &cylinder,
         t * t * (3.0f - 2.0f * t);
 
     // Four strap-on boosters.
+    // They sit on a circle around the rocket at angles 45, 135, 225, 315 deg.
+    // (cos(a), sin(a)) is the point on that circle, i.e. the direction
+    // pointing straight AWAY from the rocket's centre. Moving along it
+    // makes each booster fly off on its own side.
     for (int i = 0; i < 4; ++i)
     {
         float a = glm::radians(45.0f + 90.0f * i);
@@ -396,6 +481,12 @@ void drawRocket(Cylinder &cylinder,
     float deploySmooth =
         deployProgress * deployProgress * (3.0f - 2.0f * deployProgress);
 
+    // Two things are animated with deploySmooth (0 -> 1 in 2.5 s):
+    //   satelliteScale : 0.28 -> 1.0   (it "unfolds" / grows)
+    //   deployedOffset : moves 3.8 units to +X and 0.25 up (drifts away)
+    // This is "linear interpolation": start + (end - start) * t.
+    // Every satellite piece is placed relative to spacecraftCenter and
+    // multiplied by satelliteScale, so the whole satellite grows together.
     if (fairingSeparationStarted)
     {
         // Start compact enough to fit inside the payload fairing.
@@ -464,6 +555,14 @@ void drawRocket(Cylinder &cylinder,
     }
 }
 
+// processInput: called once per frame to read the keyboard.
+//   - Arrow keys / [ ] change the camera angles and distance.
+//     glm::min / glm::max keep them inside limits (e.g. pitch <= 80).
+//   - B, F, S, D START an animation. Starting just means:
+//       xxxStarted = true; xxxStartTime = glfwGetTime();
+//     The actual movement is then computed in drawRocket().
+//   - "xWasDown" remembers if the key was already held last frame, so
+//     holding a key down only triggers once (edge detection).
 void processInput(GLFWwindow *window)
 {
     const float angleStep = 1.2f;
@@ -540,6 +639,11 @@ void processInput(GLFWwindow *window)
     dWasDown = dDown;
 }
 
+// main: creates the window, loads shaders and meshes, then runs the
+// render loop. Each loop iteration = one frame:
+//   read keys -> clear screen -> compute camera -> drawRocket() -> show.
+// Because drawRocket() recalculates every part's position from the
+// current time, the picture changes a little every frame = animation.
 int main()
 {
     if (!glfwInit())
@@ -618,6 +722,10 @@ int main()
             float yaw = glm::radians(cameraYaw);
             float pitch = glm::radians(cameraPitch);
 
+            // Spherical -> Cartesian: turn (yaw, pitch, distance) into an
+            // x,y,z camera position on a sphere around "target".
+            // glm::lookAt(eye, target, up) builds the view matrix that
+            // points the camera from "eye" at "target".
             glm::vec3 target(0.8f, 4.7f, 0.0f);
             glm::vec3 cameraPosition(
                 target.x + cameraDistance * cos(pitch) * sin(yaw),

@@ -30,11 +30,25 @@ const double STAGE_DRAG = 1.2e-4;
 const double FAIRING_DRAG = 4.0e-4;
 }
 
+// altitudeKm: glm::length(v) = size of a vector = sqrt(x*x + y*y + z*z).
+// Earth's centre is at (0,0,0), so length(pos) is the distance from the
+// centre. Subtract Earth's radius to get height above the ground.
 double altitudeKm(const glm::dvec3& pos)
 {
     return glm::length(pos) - EARTH_RADIUS_KM;
 }
 
+// stepBody: THE HEART OF THE MOTION. Moves one body forward by dt seconds.
+//   1. acceleration = gravity + thrust + drag
+//        gravity: points to Earth's centre (-up), strength mu / r^2
+//        thrust : engine push along thrustDir (0 for debris)
+//        drag   : air resistance opposite to velocity, only below 100 km;
+//                 air gets thinner with height (exp(-h / 8.5))
+//   2. velocity += acceleration * dt     (speed changes)
+//   3. position += velocity * dt         (object moves)
+// Doing this many times per second gives a smooth curved path.
+// "up = pos / r" -> dividing a vector by its length gives a unit vector
+// (length 1) that only says the DIRECTION (same as glm::normalize).
 void stepBody(Body& body, double thrustAccel, const glm::dvec3& thrustDir,
               double dragFactor, double dt)
 {
@@ -63,6 +77,16 @@ void stepBody(Body& body, double thrustAccel, const glm::dvec3& thrustDir,
     body.pos += body.vel * dt;
 }
 
+// reset: clears everything and puts the rocket on the pad.
+// It also builds the local directions at the launch site:
+//   up    = away from Earth's centre
+//   east  = cross(northPole, up)   (glm::cross gives a vector at 90 deg
+//                                   to both inputs)
+//   north = cross(up, east)
+// launchHeading = the compass direction to fly (104 deg = east-south-east),
+// made by mixing north and east with cos/sin of the azimuth angle.
+// trajectoryNormal = the side direction (perpendicular to the flight
+// plane); used later to stop the rocket from rolling randomly.
 void Flight::reset(const glm::dvec3& siteDirection, double launchAzimuthDeg)
 {
     *this = Flight();
@@ -80,6 +104,7 @@ void Flight::reset(const glm::dvec3& siteDirection, double launchAzimuthDeg)
     vehicleAxis = up;
 }
 
+// launch: sets launched = true so update() starts running the simulation.
 void Flight::launch()
 {
     if (launched)
@@ -88,6 +113,12 @@ void Flight::launch()
     logEvent("Lift-off from Sriharikota");
 }
 
+// update: called once per frame with the frame time (already multiplied
+// by time-warp). Physics is more stable with a FIXED step, so we put
+// the time into an "accumulator" and run as many 0.02 s steps as fit.
+// Example: frame time 0.05 s -> 2 steps (0.04 s), 0.01 s is kept for
+// the next frame. std::min(..., 100) stops a huge freeze/lag from
+// trying to run millions of steps at once.
 void Flight::update(double missionSeconds)
 {
     if (!launched)
@@ -102,6 +133,18 @@ void Flight::update(double missionSeconds)
     }
 }
 
+// guidanceDirection: decides where the rocket's nose should point.
+// A real rocket goes straight up first and then slowly tilts over to
+// fly sideways (needed to reach orbit). This is called a "gravity turn".
+//   tilt = 0 deg  -> pointing straight up
+//   tilt = 90 deg -> pointing flat along the horizon
+// tilt = 90 * sqrt(clamp(h / 180, 0, 1)):
+//   h / 180 -> 0 at the ground, 1 at 180 km
+//   clamp   -> keeps it in 0..1 so tilt never goes beyond 90 deg
+//   sqrt    -> tilts faster early on, slower later
+// If the rocket is not climbing fast enough to reach 250 km, the tilt
+// is reduced (nose pushed back up). Final direction is a blend:
+//   cos(tilt) * up + sin(tilt) * horizontal
 glm::dvec3 Flight::guidanceDirection() const
 {
     double r = glm::length(vehicle.pos);
@@ -133,6 +176,14 @@ glm::dvec3 Flight::guidanceDirection() const
     return glm::normalize(std::cos(t) * up + std::sin(t) * horizontal);
 }
 
+// step: one 0.02 s tick of the whole mission.
+//   - rocket: if an engine is burning, point it using guidance; if not
+//     (coasting), point it along its velocity (nose first). Then move it.
+//   - every debris piece: move it with NO thrust (only gravity + drag),
+//     so it slows down and falls behind the rocket. If it goes below
+//     0 km it has hit the ground/sea and is switched off.
+//   - satellite (after release): move it with gravity only.
+//   - finally check if any separation event should happen now.
 void Flight::step(double dt)
 {
     missionTime += dt;
@@ -160,6 +211,18 @@ void Flight::step(double dt)
     checkEvents();
 }
 
+// checkEvents: the "script" of the mission, driven by ALTITUDE (not time).
+//   25 km  -> 4 boosters separate (each pushed outward on its own side)
+//   58 km  -> stage 1 separates (pushed slightly backwards: -axis)
+//   115 km -> fairing halves separate (pushed sideways, +Z and -Z)
+//   135 km -> stage 2 separates
+//   195 km -> stage 3 separates
+//   PS4 fires until horizontal speed = orbital speed sqrt(mu / r)
+//   20 s after that -> Mangalyaan is released with a small push forward
+// Changing "phase" is what makes main.cpp stop drawing a stage on the
+// rocket; addDebris() is what makes it appear as a separate falling part.
+// The small "kick" velocities (e.g. 0.012 km/s = 12 m/s) are the
+// separation springs/motors that push parts apart.
 void Flight::checkEvents()
 {
     double h = altitudeKm(vehicle.pos);
@@ -231,6 +294,10 @@ void Flight::checkEvents()
     }
 }
 
+// addDebris: creates a separated part. It starts EXACTLY where the rocket
+// is, with the rocket's speed + a small kick, and remembers the rocket's
+// rotation at that moment (frame) and the time (releaseTime). From then
+// on step() moves it on its own.
 void Flight::addDebris(DebrisKind kind, int index, const glm::dvec3& kick,
                        double dragFactor)
 {
@@ -246,6 +313,9 @@ void Flight::addDebris(DebrisKind kind, int index, const glm::dvec3& kick,
     debris.push_back(d);
 }
 
+// logEvent: formats a status line and stores it; main.cpp prints it.
+// Also records lastEventTime, which main.cpp uses to slow time-warp
+// down to 1x for a few seconds so you can watch the separation.
 void Flight::logEvent(const std::string& text)
 {
     char line[160];
@@ -256,6 +326,14 @@ void Flight::logEvent(const std::string& text)
     lastEventTime = missionTime;
 }
 
+// frameForAxis: builds the rocket's rotation from its pointing direction.
+// A rotation in 3D = three perpendicular axes (x, y, z) stored as the
+// columns of a 3x3 matrix.
+//   y = the nose direction (glm::normalize -> make length 1)
+//   x = trajectoryNormal with its "y part" removed
+//       (v - dot(v, y) * y  keeps only the part of v at 90 deg to y)
+//   z = cross(x, y), the third axis at 90 deg to both
+// glm::dot(a, b) = how much a points along b (a number).
 glm::mat3 Flight::frameForAxis(const glm::dvec3& axis) const
 {
     glm::dvec3 y = glm::normalize(axis);
@@ -265,6 +343,7 @@ glm::mat3 Flight::frameForAxis(const glm::dvec3& axis) const
     return glm::mat3(glm::vec3(x), glm::vec3(y), glm::vec3(z));
 }
 
+// vehicleFrame: current rotation of the rocket (uses its current nose direction).
 glm::mat3 Flight::vehicleFrame() const
 {
     return frameForAxis(vehicleAxis);
